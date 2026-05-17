@@ -1,23 +1,20 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 import 'local_notifications_service.dart';
 import 'notification_ids.dart';
+import 'notification_schedule_result.dart';
 
 /// Notificaciones locales con [flutter_local_notifications].
 ///
-/// Limitaciones (Android):
-/// - Android 13+ requiere [POST_NOTIFICATIONS].
-/// - El fabricante puede retrasar o agrupar avisos en segundo plano.
+/// Android (Sprint 3):
+/// - Intenta [AndroidScheduleMode.exactAllowWhileIdle] si hay permiso
+///   [SCHEDULE_EXACT_ALARM] / [canScheduleExactNotifications].
+/// - Si falla o no hay permiso, usa [AndroidScheduleMode.inexactAllowWhileIdle].
+/// - Android 13+ requiere [POST_NOTIFICATIONS] por separado.
 /// - Tras reiniciar el dispositivo, los avisos no se reponen en este sprint.
-///
-/// Nota técnica — [AndroidScheduleMode.inexactAllowWhileIdle] (Sprint 3):
-/// - Se usa en Sprint 3 para no pedir permisos avanzados (p. ej. alarmas exactas).
-/// - Android puede retrasar notificaciones inexactas ~40–60 s o más por ahorro de
-///   batería, Doze o políticas del fabricante.
-/// - En una versión futura se evaluará [AndroidScheduleMode.exactAllowWhileIdle]
-///   con [SCHEDULE_EXACT_ALARM] y fallback a modo inexacto si no hay permiso.
 class FlutterLocalNotificationsService implements LocalNotificationsService {
   FlutterLocalNotificationsService();
 
@@ -30,6 +27,10 @@ class FlutterLocalNotificationsService implements LocalNotificationsService {
       FlutterLocalNotificationsPlugin();
 
   bool _initialized = false;
+
+  AndroidFlutterLocalNotificationsPlugin? get _androidPlugin =>
+      _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
 
   @override
   Future<void> initialize() async {
@@ -47,10 +48,7 @@ class FlutterLocalNotificationsService implements LocalNotificationsService {
 
     await _plugin.initialize(settings);
 
-    final androidPlugin =
-        _plugin.resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
-    await androidPlugin?.createNotificationChannel(
+    await _androidPlugin?.createNotificationChannel(
       const AndroidNotificationChannel(
         _channelId,
         _channelName,
@@ -69,9 +67,7 @@ class FlutterLocalNotificationsService implements LocalNotificationsService {
       return true;
     }
 
-    final androidPlugin =
-        _plugin.resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
+    final androidPlugin = _androidPlugin;
     if (androidPlugin != null) {
       final granted = await androidPlugin.requestNotificationsPermission();
       return granted ?? false;
@@ -87,9 +83,7 @@ class FlutterLocalNotificationsService implements LocalNotificationsService {
       return true;
     }
 
-    final androidPlugin =
-        _plugin.resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
+    final androidPlugin = _androidPlugin;
     if (androidPlugin != null) {
       final enabled = await androidPlugin.areNotificationsEnabled();
       return enabled ?? false;
@@ -99,7 +93,39 @@ class FlutterLocalNotificationsService implements LocalNotificationsService {
   }
 
   @override
-  Future<void> scheduleReminderNotification({
+  Future<bool> canScheduleExactAlarms() async {
+    final androidPlugin = _androidPlugin;
+    if (androidPlugin == null) {
+      return true;
+    }
+    return await androidPlugin.canScheduleExactNotifications() ?? false;
+  }
+
+  @override
+  Future<bool> requestExactAlarmsPermission() async {
+    final androidPlugin = _androidPlugin;
+    if (androidPlugin == null) {
+      return true;
+    }
+    return await androidPlugin.requestExactAlarmsPermission() ?? false;
+  }
+
+  static tz.TZDateTime _toLocalTzDateTime(DateTime fechaAviso) {
+    return tz.TZDateTime(
+      tz.local,
+      fechaAviso.year,
+      fechaAviso.month,
+      fechaAviso.day,
+      fechaAviso.hour,
+      fechaAviso.minute,
+      fechaAviso.second,
+      fechaAviso.millisecond,
+      fechaAviso.microsecond,
+    );
+  }
+
+  @override
+  Future<ScheduleReminderResult> scheduleReminderNotification({
     required String actividadId,
     required String title,
     String? body,
@@ -107,10 +133,69 @@ class FlutterLocalNotificationsService implements LocalNotificationsService {
   }) async {
     await initialize();
 
-    final scheduled = tz.TZDateTime.from(scheduledDate, tz.local);
+    final ahora = DateTime.now();
+    final scheduled = _toLocalTzDateTime(scheduledDate);
     final notificationId = notificationIdForActividad(actividadId);
+    final delta = scheduledDate.difference(ahora);
 
-    await _plugin.zonedSchedule(
+    if (kDebugMode) {
+      debugPrint(
+        '[Notif] programar id=$actividadId notifId=$notificationId '
+        'fechaAviso=$scheduledDate tz=$scheduled ahora=$ahora '
+        'delta=${delta.inSeconds}s (${delta.inMinutes} min) '
+        'tzLocal=${tz.local.name} '
+        'exactPermitido=${await canScheduleExactAlarms()}',
+      );
+    }
+
+    if (_androidPlugin != null && await canScheduleExactAlarms()) {
+      try {
+        await _zonedSchedule(
+          notificationId: notificationId,
+          title: title,
+          body: body,
+          scheduled: scheduled,
+          mode: AndroidScheduleMode.exactAllowWhileIdle,
+        );
+        if (kDebugMode) {
+          debugPrint('[Notif] modo usado=exactAllowWhileIdle');
+        }
+        return const ScheduleReminderResult(
+          NotificationSchedulePrecision.exact,
+        );
+      } catch (error, stackTrace) {
+        if (kDebugMode) {
+          debugPrint(
+            '[Notif] exactAllowWhileIdle falló, fallback inexacto: $error',
+          );
+          debugPrint('$stackTrace');
+        }
+      }
+    }
+
+    await _zonedSchedule(
+      notificationId: notificationId,
+      title: title,
+      body: body,
+      scheduled: scheduled,
+      mode: AndroidScheduleMode.inexactAllowWhileIdle,
+    );
+    if (kDebugMode) {
+      debugPrint('[Notif] modo usado=inexactAllowWhileIdle');
+    }
+    return const ScheduleReminderResult(
+      NotificationSchedulePrecision.inexact,
+    );
+  }
+
+  Future<void> _zonedSchedule({
+    required int notificationId,
+    required String title,
+    required String? body,
+    required tz.TZDateTime scheduled,
+    required AndroidScheduleMode mode,
+  }) {
+    return _plugin.zonedSchedule(
       notificationId,
       title,
       body,
@@ -125,8 +210,7 @@ class FlutterLocalNotificationsService implements LocalNotificationsService {
         ),
         iOS: DarwinNotificationDetails(),
       ),
-      // Ver nota técnica en la documentación de esta clase.
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      androidScheduleMode: mode,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
     );
@@ -134,6 +218,10 @@ class FlutterLocalNotificationsService implements LocalNotificationsService {
 
   @override
   Future<void> cancelReminderNotification(String actividadId) async {
-    await _plugin.cancel(notificationIdForActividad(actividadId));
+    final notificationId = notificationIdForActividad(actividadId);
+    if (kDebugMode) {
+      debugPrint('[Notif] cancelar id=$actividadId notifId=$notificationId');
+    }
+    await _plugin.cancel(notificationId);
   }
 }

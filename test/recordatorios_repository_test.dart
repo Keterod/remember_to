@@ -7,6 +7,7 @@ import 'package:remember_to/features/activities/data/repositories/actividad_repo
 import 'package:remember_to/features/activities/domain/entities/actividad.dart';
 import 'package:remember_to/features/activities/domain/enums/tipo_actividad.dart';
 import 'package:remember_to/shared/services/notifications/fake_local_notifications_service.dart';
+import 'package:remember_to/shared/services/notifications/notification_ids.dart';
 
 void main() {
   late AppDatabase database;
@@ -121,6 +122,76 @@ void main() {
 
     expect(await repository.obtenerRecordatorioPorId(recordatorio.id), isNull);
     expect(notifications.findByActividadId(recordatorio.id), isNull);
+  });
+
+  test('dos recordatorios usan IDs de notificación distintos', () async {
+    notifications.permissionsGranted = true;
+    final futuro = DateTime.now().add(const Duration(hours: 1));
+
+    final uno = await repository.crearRecordatorio(
+      titulo: 'Uno',
+      fechaAviso: futuro,
+    );
+    final dos = await repository.crearRecordatorio(
+      titulo: 'Dos',
+      fechaAviso: futuro.add(const Duration(minutes: 5)),
+    );
+
+    expect(
+      notificationIdForActividad(uno.id),
+      isNot(notificationIdForActividad(dos.id)),
+    );
+    expect(notifications.scheduled, hasLength(2));
+    expect(notifications.notificationIdsByActividad.keys, {uno.id, dos.id});
+  });
+
+  test('eliminar un recordatorio no cancela el otro', () async {
+    notifications.permissionsGranted = true;
+    final futuro = DateTime.now().add(const Duration(hours: 2));
+
+    final permanece = await repository.crearRecordatorio(
+      titulo: 'Permanece',
+      fechaAviso: futuro,
+    );
+    final eliminar = await repository.crearRecordatorio(
+      titulo: 'Eliminar',
+      fechaAviso: futuro.add(const Duration(minutes: 10)),
+    );
+
+    notifications.cancelCalls.clear();
+    await repository.eliminarRecordatorioLogicamente(eliminar.id);
+
+    expect(notifications.cancelCalls, [eliminar.id]);
+    expect(notifications.findByActividadId(permanece.id), isNotNull);
+    expect(notifications.findByActividadId(eliminar.id), isNull);
+  });
+
+  test('fechaAviso en pasado guarda recordatorio pero no programa notificación',
+      () async {
+    notifications.permissionsGranted = true;
+    final pasado = DateTime.now().subtract(const Duration(minutes: 5));
+
+    final recordatorio = await repository.crearRecordatorio(
+      titulo: 'Pasado',
+      fechaAviso: pasado,
+    );
+
+    expect(await repository.obtenerRecordatorioPorId(recordatorio.id), isNotNull);
+    expect(notifications.findByActividadId(recordatorio.id), isNull);
+  });
+
+  test('fechaAviso en futuro programa notificación', () async {
+    notifications.permissionsGranted = true;
+    final futuro = DateTime.now().add(const Duration(minutes: 10));
+
+    final recordatorio = await repository.crearRecordatorio(
+      titulo: 'Futuro',
+      fechaAviso: futuro,
+    );
+
+    final programada = notifications.findByActividadId(recordatorio.id);
+    expect(programada, isNotNull);
+    expect(programada!.scheduledDate, futuro);
   });
 
   test('obtenerRecordatorioPorId rechaza actividad que no es recordatorio', () async {

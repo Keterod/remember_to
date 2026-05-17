@@ -1,5 +1,8 @@
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
+
+import '../../../../shared/services/notifications/notification_ids.dart';
 
 import '../../../../core/errors/validation_exception.dart';
 import '../../../../shared/services/notifications/local_notifications_service.dart';
@@ -281,18 +284,44 @@ class ActividadRepositoryImpl implements ActividadRepository {
   }
 
   Future<void> _sincronizarNotificacionRecordatorio(Actividad recordatorio) async {
+    final ahora = DateTime.now();
     await _notifications.cancelReminderNotification(recordatorio.id);
 
     if (recordatorio.fechaAviso == null) {
+      if (kDebugMode) {
+        debugPrint(
+          '[Notif] omitir ${recordatorio.id}: sin fechaAviso',
+        );
+      }
       return;
     }
 
-    if (!recordatorio.fechaAviso!.isAfter(DateTime.now())) {
+    if (!recordatorio.fechaAviso!.isAfter(ahora)) {
+      if (kDebugMode) {
+        debugPrint(
+          '[Notif] omitir ${recordatorio.id}: fechaAviso en pasado '
+          '(${recordatorio.fechaAviso})',
+        );
+      }
       return;
     }
 
-    if (!await _notifications.areNotificationsEnabled()) {
+    final permisos = await _notifications.areNotificationsEnabled();
+    if (!permisos) {
+      if (kDebugMode) {
+        debugPrint(
+          '[Notif] omitir ${recordatorio.id}: permisos de notificación no activos',
+        );
+      }
       return;
+    }
+
+    if (kDebugMode) {
+      debugPrint(
+        '[Notif] sincronizar ${recordatorio.id} '
+        'notifId=${notificationIdForActividad(recordatorio.id)} '
+        'fechaAviso=${recordatorio.fechaAviso}',
+      );
     }
 
     await _notifications.scheduleReminderNotification(
@@ -301,6 +330,7 @@ class ActividadRepositoryImpl implements ActividadRepository {
       body: recordatorio.descripcion,
       scheduledDate: recordatorio.fechaAviso!,
     );
+    // El resultado (exacto/inexacto) queda disponible vía el servicio para la UI.
   }
 
   Future<Actividad> _obtenerTarea(String id) async {

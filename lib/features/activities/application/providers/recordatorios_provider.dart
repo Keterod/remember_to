@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../shared/services/notifications/local_notifications_provider.dart';
+import '../../../../shared/services/notifications/local_notifications_service.dart';
 import '../../domain/entities/actividad.dart';
 import 'actividad_repository_provider.dart';
 
@@ -24,12 +25,24 @@ class RecordatoriosNotifier extends AsyncNotifier<List<Actividad>> {
 
   Future<bool> solicitarPermisosNotificacion() async {
     final service = ref.read(localNotificationsServiceProvider);
-    return service.requestPermissions();
+    final notificaciones = await service.requestPermissions();
+    await service.requestExactAlarmsPermission();
+    return notificaciones;
   }
 
   Future<bool> permisosNotificacionActivos() async {
     final service = ref.read(localNotificationsServiceProvider);
     return service.areNotificationsEnabled();
+  }
+
+  Future<bool> alarmasExactasDisponibles() async {
+    final service = ref.read(localNotificationsServiceProvider);
+    return service.canScheduleExactAlarms();
+  }
+
+  Future<bool> solicitarAlarmaExacta() async {
+    final service = ref.read(localNotificationsServiceProvider);
+    return service.requestExactAlarmsPermission();
   }
 
   Future<void> crearRecordatorio({
@@ -58,5 +71,10 @@ class RecordatoriosNotifier extends AsyncNotifier<List<Actividad>> {
     final repository = ref.read(actividadRepositoryProvider);
     await repository.eliminarRecordatorioLogicamente(id);
     await recargar();
+  }
+
+  /// True si conviene mostrar [LocalNotificationsService.exactAlarmGuidanceMessage].
+  Future<bool> debeMostrarGuiaAlarmaExacta() async {
+    return !(await alarmasExactasDisponibles());
   }
 }

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../app/widgets/app_section_navigation.dart';
 import '../../../../core/errors/validation_exception.dart';
+import '../../../../shared/services/notifications/local_notifications_service.dart';
 import '../../application/providers/recordatorios_provider.dart';
 import '../../domain/entities/actividad.dart';
 
@@ -20,7 +21,8 @@ class RecordatoriosListScreen extends ConsumerStatefulWidget {
 class _RecordatoriosListScreenState extends ConsumerState<RecordatoriosListScreen> {
   static final _fechaHoraFormato = DateFormat('dd/MM/yyyy HH:mm');
 
-  bool? _permisosActivos;
+  bool? _permisosNotificacionActivos;
+  bool? _alarmasExactasDisponibles;
 
   @override
   void initState() {
@@ -31,19 +33,26 @@ class _RecordatoriosListScreenState extends ConsumerState<RecordatoriosListScree
   }
 
   Future<void> _revisarPermisos() async {
-    final activos =
-        await ref.read(recordatoriosProvider.notifier).permisosNotificacionActivos();
+    final notifier = ref.read(recordatoriosProvider.notifier);
+    final notificaciones = await notifier.permisosNotificacionActivos();
+    final exactas = await notifier.alarmasExactasDisponibles();
     if (mounted) {
-      setState(() => _permisosActivos = activos);
+      setState(() {
+        _permisosNotificacionActivos = notificaciones;
+        _alarmasExactasDisponibles = exactas;
+      });
     }
   }
 
   Future<void> _solicitarPermisos() async {
-    final concedido = await ref
-        .read(recordatoriosProvider.notifier)
-        .solicitarPermisosNotificacion();
+    final notifier = ref.read(recordatoriosProvider.notifier);
+    final concedido = await notifier.solicitarPermisosNotificacion();
+    final exactas = await notifier.alarmasExactasDisponibles();
     if (mounted) {
-      setState(() => _permisosActivos = concedido);
+      setState(() {
+        _permisosNotificacionActivos = concedido;
+        _alarmasExactasDisponibles = exactas;
+      });
       if (!concedido) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -51,6 +60,23 @@ class _RecordatoriosListScreenState extends ConsumerState<RecordatoriosListScree
               'Sin permiso de notificaciones el recordatorio se guarda, '
               'pero el aviso no está garantizado en este dispositivo.',
             ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _solicitarAlarmaExacta() async {
+    final concedido =
+        await ref.read(recordatoriosProvider.notifier).solicitarAlarmaExacta();
+    final exactas =
+        await ref.read(recordatoriosProvider.notifier).alarmasExactasDisponibles();
+    if (mounted) {
+      setState(() => _alarmasExactasDisponibles = exactas);
+      if (!concedido && !exactas) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(LocalNotificationsService.exactAlarmGuidanceMessage),
           ),
         );
       }
@@ -71,17 +97,29 @@ class _RecordatoriosListScreenState extends ConsumerState<RecordatoriosListScree
       ),
       body: Column(
         children: [
-          if (_permisosActivos == false)
+          if (_permisosNotificacionActivos == false)
             MaterialBanner(
               content: const Text(
                 'Activa las notificaciones para recibir avisos. '
-                'En Android 13+ se requiere permiso explícito. '
-                'Las alarmas exactas pueden variar según el fabricante.',
+                'En Android 13+ se requiere permiso explícito.',
               ),
               actions: [
                 TextButton(
                   onPressed: _solicitarPermisos,
                   child: const Text('Activar'),
+                ),
+              ],
+            ),
+          if (_permisosNotificacionActivos == true &&
+              _alarmasExactasDisponibles == false)
+            MaterialBanner(
+              content: const Text(
+                LocalNotificationsService.exactAlarmGuidanceMessage,
+              ),
+              actions: [
+                TextButton(
+                  onPressed: _solicitarAlarmaExacta,
+                  child: const Text('Configurar'),
                 ),
               ],
             ),

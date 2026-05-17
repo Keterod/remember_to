@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/errors/validation_exception.dart';
+import '../../../../shared/services/notifications/local_notifications_service.dart';
 import '../../application/providers/actividad_repository_provider.dart';
 import '../../application/providers/recordatorios_provider.dart';
 import '../../domain/entities/actividad.dart';
@@ -227,6 +228,8 @@ class _RecordatorioFormScreenState extends ConsumerState<RecordatorioFormScreen>
 
       if (!await notifier.permisosNotificacionActivos()) {
         await notifier.solicitarPermisosNotificacion();
+      } else if (await notifier.debeMostrarGuiaAlarmaExacta()) {
+        await notifier.solicitarAlarmaExacta();
       }
 
       if (widget.esEdicion) {
@@ -271,6 +274,23 @@ class _RecordatorioFormScreenState extends ConsumerState<RecordatorioFormScreen>
             ),
           ),
         );
+      } else {
+        final necesitaGuiaExacta = await notifier.debeMostrarGuiaAlarmaExacta();
+        if (!mounted) {
+          return;
+        }
+        if (necesitaGuiaExacta) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                LocalNotificationsService.exactAlarmGuidanceMessage,
+              ),
+            ),
+          );
+        }
+      }
+      if (!mounted) {
+        return;
       }
       context.pop();
     } on ValidationException catch (e) {
