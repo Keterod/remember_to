@@ -4,7 +4,6 @@ import 'package:uuid/uuid.dart';
 
 import 'package:remember_to/features/activities/data/local/database.dart';
 import 'package:remember_to/features/activities/data/repositories/actividad_repository_impl.dart';
-import 'package:remember_to/shared/services/notifications/fake_local_notifications_service.dart';
 import 'package:remember_to/features/activities/domain/entities/actividad.dart';
 import 'package:remember_to/features/activities/domain/enums/estado_actividad.dart';
 import 'package:remember_to/features/activities/domain/enums/tipo_actividad.dart';
@@ -15,10 +14,7 @@ void main() {
 
   setUp(() {
     database = AppDatabase(NativeDatabase.memory());
-    repository = ActividadRepositoryImpl(
-      database,
-      FakeLocalNotificationsService(),
-    );
+    repository = ActividadRepositoryImpl(database);
   });
 
   tearDown(() async {

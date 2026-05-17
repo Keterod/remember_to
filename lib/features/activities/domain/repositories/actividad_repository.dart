@@ -24,19 +24,4 @@ abstract class ActividadRepository {
   Future<void> marcarPendiente(String id);
 
   Future<void> eliminarLogicamente(String id);
-
-  Future<Actividad> crearRecordatorio({
-    required String titulo,
-    String? descripcion,
-    required DateTime fechaAviso,
-    bool urgente = false,
-  });
-
-  Future<List<Actividad>> listarRecordatoriosActivos();
-
-  Future<Actividad?> obtenerRecordatorioPorId(String id);
-
-  Future<void> editarRecordatorio(Actividad recordatorio);
-
-  Future<void> eliminarRecordatorioLogicamente(String id);
 }

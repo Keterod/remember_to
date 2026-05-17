@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../../../../app/widgets/app_section_navigation.dart';
 import '../../../../core/errors/validation_exception.dart';
 import '../../application/providers/tareas_provider.dart';
 import '../../domain/entities/actividad.dart';
@@ -23,10 +22,6 @@ class TareasListScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Tareas'),
-        actions: const [
-          AppSectionNavigation(seccionActual: AppSection.tareas),
-          SizedBox(width: 8),
-        ],
       ),
       body: tareasAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),

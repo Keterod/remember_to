@@ -6,7 +6,6 @@ import 'package:remember_to/features/activities/data/repositories/actividad_repo
 import 'package:remember_to/features/activities/domain/enums/estado_actividad.dart';
 import 'package:remember_to/features/activities/domain/enums/tipo_actividad.dart';
 import 'package:remember_to/features/activities/domain/utils/tarea_vencimiento.dart';
-import 'package:remember_to/shared/services/notifications/fake_local_notifications_service.dart';
 
 void main() {
   late AppDatabase database;
@@ -14,10 +13,7 @@ void main() {
 
   setUp(() {
     database = AppDatabase(NativeDatabase.memory());
-    repository = ActividadRepositoryImpl(
-      database,
-      FakeLocalNotificationsService(),
-    );
+    repository = ActividadRepositoryImpl(database);
   });
 
   tearDown(() async {

@@ -2,7 +2,6 @@ import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../core/errors/validation_exception.dart';
-import '../../../../shared/services/notifications/local_notifications_service.dart';
 import '../../domain/entities/actividad.dart';
 import '../../domain/enums/estado_actividad.dart';
 import '../../domain/enums/tipo_actividad.dart';
@@ -11,10 +10,9 @@ import '../local/database.dart';
 import '../mappers/actividad_mapper.dart';
 
 class ActividadRepositoryImpl implements ActividadRepository {
-  ActividadRepositoryImpl(this._database, this._notifications);
+  ActividadRepositoryImpl(this._database);
 
   final AppDatabase _database;
-  final LocalNotificationsService _notifications;
   static const _uuid = Uuid();
 
   @override
@@ -42,20 +40,6 @@ class ActividadRepositoryImpl implements ActividadRepository {
   }
 
   @override
-  Future<List<Actividad>> listarRecordatoriosActivos() async {
-    final query = _database.select(_database.actividades)
-      ..where(
-        (row) =>
-            row.deletedAt.isNull() &
-            row.tipo.equals(TipoActividad.recordatorio.storageValue),
-      )
-      ..orderBy([(row) => OrderingTerm.asc(row.fechaAviso)]);
-
-    final rows = await query.get();
-    return rows.map(ActividadMapper.toDomain).toList();
-  }
-
-  @override
   Future<Actividad?> obtenerPorId(String id) async {
     final query = _database.select(_database.actividades)
       ..where((row) => row.id.equals(id) & row.deletedAt.isNull());
@@ -65,18 +49,6 @@ class ActividadRepositoryImpl implements ActividadRepository {
       return null;
     }
     return ActividadMapper.toDomain(row);
-  }
-
-  @override
-  Future<Actividad?> obtenerRecordatorioPorId(String id) async {
-    final recordatorio = await obtenerPorId(id);
-    if (recordatorio == null) {
-      return null;
-    }
-    if (recordatorio.tipo != TipoActividad.recordatorio) {
-      throw const ValidationException('El registro no es un recordatorio.');
-    }
-    return recordatorio;
   }
 
   @override
@@ -116,36 +88,6 @@ class ActividadRepositoryImpl implements ActividadRepository {
   }
 
   @override
-  Future<Actividad> crearRecordatorio({
-    required String titulo,
-    String? descripcion,
-    required DateTime fechaAviso,
-    bool urgente = false,
-  }) async {
-    _validarDatosRecordatorio(
-      titulo: titulo,
-      fechaAviso: fechaAviso,
-    );
-
-    final ahora = DateTime.now();
-    final recordatorio = Actividad(
-      id: _uuid.v4(),
-      tipo: TipoActividad.recordatorio,
-      titulo: titulo.trim(),
-      descripcion: _descripcionNormalizada(descripcion),
-      estado: EstadoActividad.pendiente,
-      urgente: urgente,
-      fechaAviso: fechaAviso,
-      createdAt: ahora,
-      updatedAt: ahora,
-    );
-
-    await guardar(recordatorio);
-    await _sincronizarNotificacionRecordatorio(recordatorio);
-    return recordatorio;
-  }
-
-  @override
   Future<void> editarTarea(Actividad tarea) async {
     _validarTarea(tarea);
 
@@ -174,34 +116,6 @@ class ActividadRepositoryImpl implements ActividadRepository {
     );
 
     await guardar(actualizada);
-  }
-
-  @override
-  Future<void> editarRecordatorio(Actividad recordatorio) async {
-    _validarRecordatorio(recordatorio);
-
-    final existente = await obtenerRecordatorioPorId(recordatorio.id);
-    if (existente == null) {
-      throw const ValidationException(
-        'El recordatorio no existe o fue eliminado.',
-      );
-    }
-
-    final actualizado = Actividad(
-      id: recordatorio.id,
-      tipo: TipoActividad.recordatorio,
-      titulo: recordatorio.titulo.trim(),
-      descripcion: _descripcionNormalizada(recordatorio.descripcion),
-      estado: recordatorio.estado,
-      urgente: recordatorio.urgente,
-      fechaAviso: recordatorio.fechaAviso,
-      createdAt: existente.createdAt,
-      updatedAt: DateTime.now(),
-      deletedAt: existente.deletedAt,
-    );
-
-    await guardar(actualizado);
-    await _sincronizarNotificacionRecordatorio(actualizado);
   }
 
   @override
@@ -237,28 +151,6 @@ class ActividadRepositoryImpl implements ActividadRepository {
     );
   }
 
-  @override
-  Future<void> eliminarRecordatorioLogicamente(String id) async {
-    final recordatorio = await _obtenerRecordatorio(id);
-    await _notifications.cancelReminderNotification(recordatorio.id);
-
-    final ahora = DateTime.now();
-    await guardar(
-      Actividad(
-        id: recordatorio.id,
-        tipo: recordatorio.tipo,
-        titulo: recordatorio.titulo,
-        descripcion: recordatorio.descripcion,
-        estado: recordatorio.estado,
-        urgente: recordatorio.urgente,
-        fechaAviso: recordatorio.fechaAviso,
-        createdAt: recordatorio.createdAt,
-        updatedAt: ahora,
-        deletedAt: ahora,
-      ),
-    );
-  }
-
   Future<void> _actualizarEstado(String id, EstadoActividad estado) async {
     final tarea = await _obtenerTarea(id);
     await guardar(
@@ -280,29 +172,6 @@ class ActividadRepositoryImpl implements ActividadRepository {
     );
   }
 
-  Future<void> _sincronizarNotificacionRecordatorio(Actividad recordatorio) async {
-    await _notifications.cancelReminderNotification(recordatorio.id);
-
-    if (recordatorio.fechaAviso == null) {
-      return;
-    }
-
-    if (!recordatorio.fechaAviso!.isAfter(DateTime.now())) {
-      return;
-    }
-
-    if (!await _notifications.areNotificationsEnabled()) {
-      return;
-    }
-
-    await _notifications.scheduleReminderNotification(
-      actividadId: recordatorio.id,
-      title: recordatorio.titulo,
-      body: recordatorio.descripcion,
-      scheduledDate: recordatorio.fechaAviso!,
-    );
-  }
-
   Future<Actividad> _obtenerTarea(String id) async {
     final tarea = await obtenerPorId(id);
     if (tarea == null) {
@@ -312,16 +181,6 @@ class ActividadRepositoryImpl implements ActividadRepository {
       throw const ValidationException('Solo se pueden modificar tareas.');
     }
     return tarea;
-  }
-
-  Future<Actividad> _obtenerRecordatorio(String id) async {
-    final recordatorio = await obtenerRecordatorioPorId(id);
-    if (recordatorio == null) {
-      throw const ValidationException(
-        'El recordatorio no existe o fue eliminado.',
-      );
-    }
-    return recordatorio;
   }
 
   void _validarTarea(Actividad tarea) {
@@ -336,38 +195,6 @@ class ActividadRepositoryImpl implements ActividadRepository {
     if (tarea.estado != EstadoActividad.pendiente &&
         tarea.estado != EstadoActividad.completada) {
       throw const ValidationException('Estado de tarea no válido.');
-    }
-  }
-
-  void _validarRecordatorio(Actividad recordatorio) {
-    if (recordatorio.tipo != TipoActividad.recordatorio) {
-      throw const ValidationException(
-        'No se puede guardar una actividad sin tipo recordatorio.',
-      );
-    }
-    _validarDatosRecordatorio(
-      titulo: recordatorio.titulo,
-      fechaAviso: recordatorio.fechaAviso,
-    );
-    if (recordatorio.estado != EstadoActividad.pendiente &&
-        recordatorio.estado != EstadoActividad.completada) {
-      throw const ValidationException('Estado de recordatorio no válido.');
-    }
-  }
-
-  void _validarDatosRecordatorio({
-    required String titulo,
-    required DateTime? fechaAviso,
-  }) {
-    if (titulo.trim().isEmpty) {
-      throw const ValidationException(
-        'El título del recordatorio es obligatorio.',
-      );
-    }
-    if (fechaAviso == null) {
-      throw const ValidationException(
-        'La fecha y hora de aviso son obligatorias.',
-      );
     }
   }
 
