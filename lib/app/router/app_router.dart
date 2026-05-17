@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/activities/presentation/screens/actividad_reciente_screen.dart';
 import '../../features/activities/presentation/screens/agenda_screen.dart';
+import '../../features/activities/presentation/screens/busqueda_screen.dart';
 import '../../features/activities/presentation/screens/calendario_screen.dart';
 import '../../features/activities/presentation/screens/evento_form_screen.dart';
 import '../../features/activities/presentation/screens/eventos_list_screen.dart';
@@ -112,6 +114,14 @@ class AppRouter {
       GoRoute(
         path: '/agenda',
         builder: (context, state) => const AgendaScreen(),
+      ),
+      GoRoute(
+        path: '/actividad-reciente',
+        builder: (context, state) => const ActividadRecienteScreen(),
+      ),
+      GoRoute(
+        path: '/busqueda',
+        builder: (context, state) => const BusquedaScreen(),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

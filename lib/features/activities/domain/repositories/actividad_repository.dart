@@ -1,5 +1,6 @@
 import '../entities/actividad.dart';
 import '../entities/elemento_vista_temporal.dart';
+import '../entities/historial_actividad.dart';
 import '../entities/ocurrencia_actividad.dart';
 import '../entities/repeticion.dart';
 
@@ -127,4 +128,10 @@ abstract class ActividadRepository {
     required DateTime inicio,
     required DateTime fin,
   });
+
+  Future<List<HistorialActividad>> listarHistorialReciente({
+    int limite = 50,
+  });
+
+  Future<List<Actividad>> buscarActividadesActivas(String consulta);
 }

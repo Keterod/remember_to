@@ -17,3 +17,21 @@ extension TipoActividadStorage on TipoActividad {
     );
   }
 }
+
+/// Rutas de edición para navegación desde búsqueda y listas (Sprint 6).
+extension TipoActividadNavegacion on TipoActividad {
+  String? rutaEdicion(String actividadId) {
+    switch (this) {
+      case TipoActividad.tarea:
+        return '/tareas/$actividadId/editar';
+      case TipoActividad.recordatorio:
+        return '/recordatorios/$actividadId/editar';
+      case TipoActividad.evento:
+        return '/eventos/$actividadId/editar';
+      case TipoActividad.rutina:
+        return '/rutinas/$actividadId/editar';
+      case TipoActividad.tareaMensual:
+        return '/tareas-mensuales/$actividadId/editar';
+    }
+  }
+}

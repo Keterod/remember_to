@@ -111,6 +111,19 @@ para identificar lo que no completé a tiempo.
 - Dado que una actividad no tiene fecha límite, cuando consulto Vencidas, entonces no aparece.
 - Dado que completo o reprogramo una actividad vencida, cuando actualizo la vista, entonces deja de mostrarse como vencida.
 
+## HU-29: Buscar y abrir actividad
+
+Como usuario,  
+quiero buscar una actividad por título o descripción y abrir el resultado encontrado,  
+para revisar o modificar rápidamente una actividad existente.
+
+**Criterios de aceptación**
+
+- Dado que existen actividades activas, cuando escribo un término, entonces se muestran coincidencias.
+- Dado que selecciono un resultado, cuando la actividad tiene tipo reconocido, entonces se abre la pantalla correspondiente.
+- Dado que una actividad está eliminada, cuando busco, entonces no debe aparecer.
+- Dado que no hay resultados, cuando busco, entonces se muestra un mensaje claro.
+
 ## HU-10: Usar calendario
 
 Como usuario,  

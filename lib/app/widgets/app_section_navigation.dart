@@ -46,7 +46,9 @@ enum AppSection {
   proximas('Próximas', '/proximas'),
   vencidas('Vencidas', '/vencidas'),
   calendario('Calendario', '/calendario'),
-  agenda('Agenda', '/agenda');
+  agenda('Agenda', '/agenda'),
+  actividadReciente('Actividad reciente', '/actividad-reciente'),
+  busqueda('Búsqueda', '/busqueda');
 
   const AppSection(this.etiqueta, this.ruta);
 

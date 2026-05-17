@@ -157,3 +157,11 @@ Se deben probar cuando la función exista:
 | CP-40 | Posponer desde notificación | Usar acción de posponer en notificación. | La actividad u ocurrencia queda aplazada y con nuevo aviso si corresponde. |
 | CP-41 | Reconstruir notificaciones tras reinicio | Simular reinicio o reconstrucción de programación. | La app reconstruye avisos pendientes cuando el sistema operativo lo permite. |
 | CP-42 | Tarea mensual con día inexistente | Crear tarea mensual para día 31 y calcular febrero. | La ocurrencia se programa para el 28 o 29 de febrero según corresponda. |
+| CP-43 | Buscar por título | Crear actividad activa y buscar por parte del título. | Aparece en resultados sin incluir eliminadas. |
+| CP-44 | Buscar por descripción | Crear actividad con descripción distintiva y buscar por ella. | Aparece en resultados. |
+| CP-45 | Excluir eliminadas en búsqueda | Eliminar lógicamente una actividad y buscar su título. | No aparece en resultados. |
+| CP-46 | Seleccionar tarea en búsqueda | Buscar una tarea y seleccionar el resultado. | Se abre la pantalla de edición de tarea. |
+| CP-47 | Seleccionar recordatorio en búsqueda | Buscar un recordatorio y seleccionar el resultado. | Se abre la pantalla de edición de recordatorio. |
+| CP-48 | Seleccionar evento en búsqueda | Buscar un evento y seleccionar el resultado. | Se abre la pantalla de edición de evento. |
+| CP-49 | Seleccionar rutina en búsqueda | Buscar una rutina y seleccionar el resultado. | Se abre la pantalla de edición de rutina. |
+| CP-50 | Seleccionar tarea mensual en búsqueda | Buscar una tarea mensual y seleccionar el resultado. | Se abre la pantalla de edición de tarea mensual. |

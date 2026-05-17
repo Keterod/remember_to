@@ -1942,6 +1942,434 @@ class OcurrenciasActividadesCompanion
   }
 }
 
+class $HistorialActividadesTable extends HistorialActividades
+    with TableInfo<$HistorialActividadesTable, HistorialActividadLocal> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $HistorialActividadesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _actividadIdMeta = const VerificationMeta(
+    'actividadId',
+  );
+  @override
+  late final GeneratedColumn<String> actividadId = GeneratedColumn<String>(
+    'actividad_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _ocurrenciaIdMeta = const VerificationMeta(
+    'ocurrenciaId',
+  );
+  @override
+  late final GeneratedColumn<String> ocurrenciaId = GeneratedColumn<String>(
+    'ocurrencia_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _accionMeta = const VerificationMeta('accion');
+  @override
+  late final GeneratedColumn<String> accion = GeneratedColumn<String>(
+    'accion',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _detalleMeta = const VerificationMeta(
+    'detalle',
+  );
+  @override
+  late final GeneratedColumn<String> detalle = GeneratedColumn<String>(
+    'detalle',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _fechaHoraMeta = const VerificationMeta(
+    'fechaHora',
+  );
+  @override
+  late final GeneratedColumn<DateTime> fechaHora = GeneratedColumn<DateTime>(
+    'fecha_hora',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    actividadId,
+    ocurrenciaId,
+    accion,
+    detalle,
+    fechaHora,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'historial_actividades';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<HistorialActividadLocal> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('actividad_id')) {
+      context.handle(
+        _actividadIdMeta,
+        actividadId.isAcceptableOrUnknown(
+          data['actividad_id']!,
+          _actividadIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('ocurrencia_id')) {
+      context.handle(
+        _ocurrenciaIdMeta,
+        ocurrenciaId.isAcceptableOrUnknown(
+          data['ocurrencia_id']!,
+          _ocurrenciaIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('accion')) {
+      context.handle(
+        _accionMeta,
+        accion.isAcceptableOrUnknown(data['accion']!, _accionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_accionMeta);
+    }
+    if (data.containsKey('detalle')) {
+      context.handle(
+        _detalleMeta,
+        detalle.isAcceptableOrUnknown(data['detalle']!, _detalleMeta),
+      );
+    }
+    if (data.containsKey('fecha_hora')) {
+      context.handle(
+        _fechaHoraMeta,
+        fechaHora.isAcceptableOrUnknown(data['fecha_hora']!, _fechaHoraMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_fechaHoraMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  HistorialActividadLocal map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return HistorialActividadLocal(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      actividadId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}actividad_id'],
+      ),
+      ocurrenciaId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}ocurrencia_id'],
+      ),
+      accion: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}accion'],
+      )!,
+      detalle: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}detalle'],
+      ),
+      fechaHora: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}fecha_hora'],
+      )!,
+    );
+  }
+
+  @override
+  $HistorialActividadesTable createAlias(String alias) {
+    return $HistorialActividadesTable(attachedDatabase, alias);
+  }
+}
+
+class HistorialActividadLocal extends DataClass
+    implements Insertable<HistorialActividadLocal> {
+  final String id;
+  final String? actividadId;
+  final String? ocurrenciaId;
+  final String accion;
+  final String? detalle;
+  final DateTime fechaHora;
+  const HistorialActividadLocal({
+    required this.id,
+    this.actividadId,
+    this.ocurrenciaId,
+    required this.accion,
+    this.detalle,
+    required this.fechaHora,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    if (!nullToAbsent || actividadId != null) {
+      map['actividad_id'] = Variable<String>(actividadId);
+    }
+    if (!nullToAbsent || ocurrenciaId != null) {
+      map['ocurrencia_id'] = Variable<String>(ocurrenciaId);
+    }
+    map['accion'] = Variable<String>(accion);
+    if (!nullToAbsent || detalle != null) {
+      map['detalle'] = Variable<String>(detalle);
+    }
+    map['fecha_hora'] = Variable<DateTime>(fechaHora);
+    return map;
+  }
+
+  HistorialActividadesCompanion toCompanion(bool nullToAbsent) {
+    return HistorialActividadesCompanion(
+      id: Value(id),
+      actividadId: actividadId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(actividadId),
+      ocurrenciaId: ocurrenciaId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ocurrenciaId),
+      accion: Value(accion),
+      detalle: detalle == null && nullToAbsent
+          ? const Value.absent()
+          : Value(detalle),
+      fechaHora: Value(fechaHora),
+    );
+  }
+
+  factory HistorialActividadLocal.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return HistorialActividadLocal(
+      id: serializer.fromJson<String>(json['id']),
+      actividadId: serializer.fromJson<String?>(json['actividadId']),
+      ocurrenciaId: serializer.fromJson<String?>(json['ocurrenciaId']),
+      accion: serializer.fromJson<String>(json['accion']),
+      detalle: serializer.fromJson<String?>(json['detalle']),
+      fechaHora: serializer.fromJson<DateTime>(json['fechaHora']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'actividadId': serializer.toJson<String?>(actividadId),
+      'ocurrenciaId': serializer.toJson<String?>(ocurrenciaId),
+      'accion': serializer.toJson<String>(accion),
+      'detalle': serializer.toJson<String?>(detalle),
+      'fechaHora': serializer.toJson<DateTime>(fechaHora),
+    };
+  }
+
+  HistorialActividadLocal copyWith({
+    String? id,
+    Value<String?> actividadId = const Value.absent(),
+    Value<String?> ocurrenciaId = const Value.absent(),
+    String? accion,
+    Value<String?> detalle = const Value.absent(),
+    DateTime? fechaHora,
+  }) => HistorialActividadLocal(
+    id: id ?? this.id,
+    actividadId: actividadId.present ? actividadId.value : this.actividadId,
+    ocurrenciaId: ocurrenciaId.present ? ocurrenciaId.value : this.ocurrenciaId,
+    accion: accion ?? this.accion,
+    detalle: detalle.present ? detalle.value : this.detalle,
+    fechaHora: fechaHora ?? this.fechaHora,
+  );
+  HistorialActividadLocal copyWithCompanion(
+    HistorialActividadesCompanion data,
+  ) {
+    return HistorialActividadLocal(
+      id: data.id.present ? data.id.value : this.id,
+      actividadId: data.actividadId.present
+          ? data.actividadId.value
+          : this.actividadId,
+      ocurrenciaId: data.ocurrenciaId.present
+          ? data.ocurrenciaId.value
+          : this.ocurrenciaId,
+      accion: data.accion.present ? data.accion.value : this.accion,
+      detalle: data.detalle.present ? data.detalle.value : this.detalle,
+      fechaHora: data.fechaHora.present ? data.fechaHora.value : this.fechaHora,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('HistorialActividadLocal(')
+          ..write('id: $id, ')
+          ..write('actividadId: $actividadId, ')
+          ..write('ocurrenciaId: $ocurrenciaId, ')
+          ..write('accion: $accion, ')
+          ..write('detalle: $detalle, ')
+          ..write('fechaHora: $fechaHora')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, actividadId, ocurrenciaId, accion, detalle, fechaHora);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is HistorialActividadLocal &&
+          other.id == this.id &&
+          other.actividadId == this.actividadId &&
+          other.ocurrenciaId == this.ocurrenciaId &&
+          other.accion == this.accion &&
+          other.detalle == this.detalle &&
+          other.fechaHora == this.fechaHora);
+}
+
+class HistorialActividadesCompanion
+    extends UpdateCompanion<HistorialActividadLocal> {
+  final Value<String> id;
+  final Value<String?> actividadId;
+  final Value<String?> ocurrenciaId;
+  final Value<String> accion;
+  final Value<String?> detalle;
+  final Value<DateTime> fechaHora;
+  final Value<int> rowid;
+  const HistorialActividadesCompanion({
+    this.id = const Value.absent(),
+    this.actividadId = const Value.absent(),
+    this.ocurrenciaId = const Value.absent(),
+    this.accion = const Value.absent(),
+    this.detalle = const Value.absent(),
+    this.fechaHora = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  HistorialActividadesCompanion.insert({
+    required String id,
+    this.actividadId = const Value.absent(),
+    this.ocurrenciaId = const Value.absent(),
+    required String accion,
+    this.detalle = const Value.absent(),
+    required DateTime fechaHora,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       accion = Value(accion),
+       fechaHora = Value(fechaHora);
+  static Insertable<HistorialActividadLocal> custom({
+    Expression<String>? id,
+    Expression<String>? actividadId,
+    Expression<String>? ocurrenciaId,
+    Expression<String>? accion,
+    Expression<String>? detalle,
+    Expression<DateTime>? fechaHora,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (actividadId != null) 'actividad_id': actividadId,
+      if (ocurrenciaId != null) 'ocurrencia_id': ocurrenciaId,
+      if (accion != null) 'accion': accion,
+      if (detalle != null) 'detalle': detalle,
+      if (fechaHora != null) 'fecha_hora': fechaHora,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  HistorialActividadesCompanion copyWith({
+    Value<String>? id,
+    Value<String?>? actividadId,
+    Value<String?>? ocurrenciaId,
+    Value<String>? accion,
+    Value<String?>? detalle,
+    Value<DateTime>? fechaHora,
+    Value<int>? rowid,
+  }) {
+    return HistorialActividadesCompanion(
+      id: id ?? this.id,
+      actividadId: actividadId ?? this.actividadId,
+      ocurrenciaId: ocurrenciaId ?? this.ocurrenciaId,
+      accion: accion ?? this.accion,
+      detalle: detalle ?? this.detalle,
+      fechaHora: fechaHora ?? this.fechaHora,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (actividadId.present) {
+      map['actividad_id'] = Variable<String>(actividadId.value);
+    }
+    if (ocurrenciaId.present) {
+      map['ocurrencia_id'] = Variable<String>(ocurrenciaId.value);
+    }
+    if (accion.present) {
+      map['accion'] = Variable<String>(accion.value);
+    }
+    if (detalle.present) {
+      map['detalle'] = Variable<String>(detalle.value);
+    }
+    if (fechaHora.present) {
+      map['fecha_hora'] = Variable<DateTime>(fechaHora.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('HistorialActividadesCompanion(')
+          ..write('id: $id, ')
+          ..write('actividadId: $actividadId, ')
+          ..write('ocurrenciaId: $ocurrenciaId, ')
+          ..write('accion: $accion, ')
+          ..write('detalle: $detalle, ')
+          ..write('fechaHora: $fechaHora, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -1949,6 +2377,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $RepeticionesTable repeticiones = $RepeticionesTable(this);
   late final $OcurrenciasActividadesTable ocurrenciasActividades =
       $OcurrenciasActividadesTable(this);
+  late final $HistorialActividadesTable historialActividades =
+      $HistorialActividadesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1957,6 +2387,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     actividades,
     repeticiones,
     ocurrenciasActividades,
+    historialActividades,
   ];
 }
 
@@ -2909,6 +3340,245 @@ typedef $$OcurrenciasActividadesTableProcessedTableManager =
       OcurrenciaActividadLocal,
       PrefetchHooks Function()
     >;
+typedef $$HistorialActividadesTableCreateCompanionBuilder =
+    HistorialActividadesCompanion Function({
+      required String id,
+      Value<String?> actividadId,
+      Value<String?> ocurrenciaId,
+      required String accion,
+      Value<String?> detalle,
+      required DateTime fechaHora,
+      Value<int> rowid,
+    });
+typedef $$HistorialActividadesTableUpdateCompanionBuilder =
+    HistorialActividadesCompanion Function({
+      Value<String> id,
+      Value<String?> actividadId,
+      Value<String?> ocurrenciaId,
+      Value<String> accion,
+      Value<String?> detalle,
+      Value<DateTime> fechaHora,
+      Value<int> rowid,
+    });
+
+class $$HistorialActividadesTableFilterComposer
+    extends Composer<_$AppDatabase, $HistorialActividadesTable> {
+  $$HistorialActividadesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get actividadId => $composableBuilder(
+    column: $table.actividadId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ocurrenciaId => $composableBuilder(
+    column: $table.ocurrenciaId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get accion => $composableBuilder(
+    column: $table.accion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get detalle => $composableBuilder(
+    column: $table.detalle,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get fechaHora => $composableBuilder(
+    column: $table.fechaHora,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$HistorialActividadesTableOrderingComposer
+    extends Composer<_$AppDatabase, $HistorialActividadesTable> {
+  $$HistorialActividadesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get actividadId => $composableBuilder(
+    column: $table.actividadId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get ocurrenciaId => $composableBuilder(
+    column: $table.ocurrenciaId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get accion => $composableBuilder(
+    column: $table.accion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get detalle => $composableBuilder(
+    column: $table.detalle,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get fechaHora => $composableBuilder(
+    column: $table.fechaHora,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$HistorialActividadesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $HistorialActividadesTable> {
+  $$HistorialActividadesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get actividadId => $composableBuilder(
+    column: $table.actividadId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get ocurrenciaId => $composableBuilder(
+    column: $table.ocurrenciaId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get accion =>
+      $composableBuilder(column: $table.accion, builder: (column) => column);
+
+  GeneratedColumn<String> get detalle =>
+      $composableBuilder(column: $table.detalle, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get fechaHora =>
+      $composableBuilder(column: $table.fechaHora, builder: (column) => column);
+}
+
+class $$HistorialActividadesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $HistorialActividadesTable,
+          HistorialActividadLocal,
+          $$HistorialActividadesTableFilterComposer,
+          $$HistorialActividadesTableOrderingComposer,
+          $$HistorialActividadesTableAnnotationComposer,
+          $$HistorialActividadesTableCreateCompanionBuilder,
+          $$HistorialActividadesTableUpdateCompanionBuilder,
+          (
+            HistorialActividadLocal,
+            BaseReferences<
+              _$AppDatabase,
+              $HistorialActividadesTable,
+              HistorialActividadLocal
+            >,
+          ),
+          HistorialActividadLocal,
+          PrefetchHooks Function()
+        > {
+  $$HistorialActividadesTableTableManager(
+    _$AppDatabase db,
+    $HistorialActividadesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$HistorialActividadesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$HistorialActividadesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$HistorialActividadesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String?> actividadId = const Value.absent(),
+                Value<String?> ocurrenciaId = const Value.absent(),
+                Value<String> accion = const Value.absent(),
+                Value<String?> detalle = const Value.absent(),
+                Value<DateTime> fechaHora = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => HistorialActividadesCompanion(
+                id: id,
+                actividadId: actividadId,
+                ocurrenciaId: ocurrenciaId,
+                accion: accion,
+                detalle: detalle,
+                fechaHora: fechaHora,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                Value<String?> actividadId = const Value.absent(),
+                Value<String?> ocurrenciaId = const Value.absent(),
+                required String accion,
+                Value<String?> detalle = const Value.absent(),
+                required DateTime fechaHora,
+                Value<int> rowid = const Value.absent(),
+              }) => HistorialActividadesCompanion.insert(
+                id: id,
+                actividadId: actividadId,
+                ocurrenciaId: ocurrenciaId,
+                accion: accion,
+                detalle: detalle,
+                fechaHora: fechaHora,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$HistorialActividadesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $HistorialActividadesTable,
+      HistorialActividadLocal,
+      $$HistorialActividadesTableFilterComposer,
+      $$HistorialActividadesTableOrderingComposer,
+      $$HistorialActividadesTableAnnotationComposer,
+      $$HistorialActividadesTableCreateCompanionBuilder,
+      $$HistorialActividadesTableUpdateCompanionBuilder,
+      (
+        HistorialActividadLocal,
+        BaseReferences<
+          _$AppDatabase,
+          $HistorialActividadesTable,
+          HistorialActividadLocal
+        >,
+      ),
+      HistorialActividadLocal,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -2922,4 +3592,6 @@ class $AppDatabaseManager {
         _db,
         _db.ocurrenciasActividades,
       );
+  $$HistorialActividadesTableTableManager get historialActividades =>
+      $$HistorialActividadesTableTableManager(_db, _db.historialActividades);
 }

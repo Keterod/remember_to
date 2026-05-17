@@ -184,6 +184,29 @@
 - Si no hay actividades, se muestra un estado vacío claro.
 - Si hay actividades vencidas del día, se muestran como condición calculada.
 
+## CU-19: Buscar y abrir actividad
+
+| Campo | Descripción |
+|---|---|
+| Actor | Usuario |
+| Descripción | Permite buscar actividades activas por título o descripción y abrir un resultado en la pantalla de edición correspondiente. |
+| Precondiciones | Existen actividades activas en la base local o la búsqueda puede devolver vacío. |
+| Postcondiciones | El usuario visualiza coincidencias o un mensaje claro; si selecciona un resultado con tipo reconocido, accede a su edición. |
+
+**Flujo principal**
+
+1. El usuario abre la pantalla de búsqueda.
+2. El usuario ingresa un término de búsqueda.
+3. El sistema consulta actividades activas por título o descripción, excluyendo eliminadas.
+4. El sistema muestra los resultados coincidentes.
+5. El usuario selecciona un resultado.
+6. El sistema abre la pantalla de edición correspondiente al tipo de actividad.
+
+**Flujos alternativos**
+
+- Si no hay resultados, el sistema muestra un mensaje claro indicando que no se encontraron actividades.
+- Si el tipo de actividad no tiene ruta de edición disponible, el sistema informa que no se puede abrir todavía.
+
 ## CU-09: Gestionar notificaciones
 
 | Campo | Descripción |

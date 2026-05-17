@@ -8,8 +8,10 @@ import '../../../../core/errors/validation_exception.dart';
 import '../../../../shared/services/notifications/local_notifications_service.dart';
 import '../../domain/entities/actividad.dart';
 import '../../domain/entities/elemento_vista_temporal.dart';
+import '../../domain/entities/historial_actividad.dart';
 import '../../domain/entities/ocurrencia_actividad.dart';
 import '../../domain/entities/repeticion.dart';
+import '../../domain/enums/accion_historial.dart';
 import '../../domain/enums/estado_actividad.dart';
 import '../../domain/enums/estado_ocurrencia.dart';
 import '../../domain/enums/tipo_actividad.dart';
@@ -18,10 +20,13 @@ import '../../domain/repositories/actividad_repository.dart';
 import '../../domain/utils/actividad_temporal.dart';
 import '../../domain/utils/actividad_vencimiento.dart';
 import '../../domain/utils/elemento_vista_temporal_utils.dart';
+import '../../domain/utils/historial_reprogramacion.dart';
 import '../../domain/utils/ocurrencia_vencimiento.dart';
+import '../../domain/utils/ordenamiento_vista_temporal.dart';
 import '../../domain/utils/repeticion_utils.dart';
 import '../local/database.dart';
 import '../mappers/actividad_mapper.dart';
+import '../mappers/historial_mapper.dart';
 import '../mappers/ocurrencia_mapper.dart';
 import '../mappers/repeticion_mapper.dart';
 
@@ -31,6 +36,7 @@ class ActividadRepositoryImpl implements ActividadRepository {
   final AppDatabase database;
   final LocalNotificationsService _notifications;
   static const _uuid = Uuid();
+  DateTime? _ultimaFechaHistorial;
 
   @override
   Future<List<Actividad>> obtenerActivas() async {
@@ -127,6 +133,11 @@ class ActividadRepositoryImpl implements ActividadRepository {
     );
 
     await guardar(tarea);
+    await _registrarHistorial(
+      actividadId: tarea.id,
+      accion: AccionHistorial.creada,
+      detalle: tarea.titulo,
+    );
     return tarea;
   }
 
@@ -157,6 +168,11 @@ class ActividadRepositoryImpl implements ActividadRepository {
 
     await guardar(recordatorio);
     await _sincronizarNotificacionRecordatorio(recordatorio);
+    await _registrarHistorial(
+      actividadId: recordatorio.id,
+      accion: AccionHistorial.creada,
+      detalle: recordatorio.titulo,
+    );
     return recordatorio;
   }
 
@@ -189,6 +205,10 @@ class ActividadRepositoryImpl implements ActividadRepository {
     );
 
     await guardar(actualizada);
+    await _registrarEdicionActividad(
+      anterior: existente,
+      actualizada: actualizada,
+    );
   }
 
   @override
@@ -217,16 +237,32 @@ class ActividadRepositoryImpl implements ActividadRepository {
 
     await guardar(actualizado);
     await _sincronizarNotificacionRecordatorio(actualizado);
+    await _registrarEdicionActividad(
+      anterior: existente,
+      actualizada: actualizado,
+    );
   }
 
   @override
   Future<void> marcarCompletada(String id) async {
     await _actualizarEstado(id, EstadoActividad.completada);
+    final tarea = await _obtenerTarea(id);
+    await _registrarHistorial(
+      actividadId: id,
+      accion: AccionHistorial.completada,
+      detalle: tarea.titulo,
+    );
   }
 
   @override
   Future<void> marcarPendiente(String id) async {
     await _actualizarEstado(id, EstadoActividad.pendiente);
+    final tarea = await _obtenerTarea(id);
+    await _registrarHistorial(
+      actividadId: id,
+      accion: AccionHistorial.marcadaPendiente,
+      detalle: tarea.titulo,
+    );
   }
 
   @override
@@ -249,6 +285,11 @@ class ActividadRepositoryImpl implements ActividadRepository {
         updatedAt: ahora,
         deletedAt: ahora,
       ),
+    );
+    await _registrarHistorial(
+      actividadId: id,
+      accion: AccionHistorial.eliminada,
+      detalle: tarea.titulo,
     );
   }
 
@@ -281,6 +322,11 @@ class ActividadRepositoryImpl implements ActividadRepository {
     );
 
     await guardar(evento);
+    await _registrarHistorial(
+      actividadId: evento.id,
+      accion: AccionHistorial.creada,
+      detalle: evento.titulo,
+    );
     return evento;
   }
 
@@ -334,6 +380,10 @@ class ActividadRepositoryImpl implements ActividadRepository {
     );
 
     await guardar(actualizado);
+    await _registrarEdicionActividad(
+      anterior: existente,
+      actualizada: actualizado,
+    );
   }
 
   @override
@@ -355,16 +405,33 @@ class ActividadRepositoryImpl implements ActividadRepository {
         deletedAt: ahora,
       ),
     );
+    await _registrarHistorial(
+      actividadId: id,
+      accion: AccionHistorial.eliminada,
+      detalle: evento.titulo,
+    );
   }
 
   @override
   Future<void> marcarEventoCompletada(String id) async {
     await _actualizarEstadoEvento(id, EstadoActividad.completada);
+    final evento = await _obtenerEvento(id);
+    await _registrarHistorial(
+      actividadId: id,
+      accion: AccionHistorial.completada,
+      detalle: evento.titulo,
+    );
   }
 
   @override
   Future<void> marcarEventoPendiente(String id) async {
     await _actualizarEstadoEvento(id, EstadoActividad.pendiente);
+    final evento = await _obtenerEvento(id);
+    await _registrarHistorial(
+      actividadId: id,
+      accion: AccionHistorial.marcadaPendiente,
+      detalle: evento.titulo,
+    );
   }
 
   @override
@@ -403,6 +470,11 @@ class ActividadRepositoryImpl implements ActividadRepository {
         diasSemana: todosLosDias ? null : diasSemana,
         fechaInicio: ahora,
       ),
+    );
+    await _registrarHistorial(
+      actividadId: rutina.id,
+      accion: AccionHistorial.creada,
+      detalle: rutina.titulo,
     );
     return rutina;
   }
@@ -479,17 +551,22 @@ class ActividadRepositoryImpl implements ActividadRepository {
       throw const ValidationException('La rutina no tiene repetición asociada.');
     }
 
-    await _guardarRepeticion(
-      Repeticion(
-        id: repeticionExistente.id,
-        actividadId: rutina.id,
-        tipo: todosLosDias ? TipoRepeticion.diaria : TipoRepeticion.semanal,
-        diasSemana: todosLosDias ? null : diasSemana,
-        intervalo: repeticionExistente.intervalo,
-        fechaInicio: repeticionExistente.fechaInicio,
-        fechaFin: repeticionExistente.fechaFin,
-        reglaTexto: repeticionExistente.reglaTexto,
-      ),
+    final repeticionActualizada = Repeticion(
+      id: repeticionExistente.id,
+      actividadId: rutina.id,
+      tipo: todosLosDias ? TipoRepeticion.diaria : TipoRepeticion.semanal,
+      diasSemana: todosLosDias ? null : diasSemana,
+      intervalo: repeticionExistente.intervalo,
+      fechaInicio: repeticionExistente.fechaInicio,
+      fechaFin: repeticionExistente.fechaFin,
+      reglaTexto: repeticionExistente.reglaTexto,
+    );
+    await _guardarRepeticion(repeticionActualizada);
+    await _registrarEdicionRutina(
+      anterior: existente,
+      actualizada: rutina,
+      repeticionAnterior: repeticionExistente,
+      repeticionActualizada: repeticionActualizada,
     );
   }
 
@@ -509,6 +586,11 @@ class ActividadRepositoryImpl implements ActividadRepository {
         updatedAt: ahora,
         deletedAt: ahora,
       ),
+    );
+    await _registrarHistorial(
+      actividadId: id,
+      accion: AccionHistorial.eliminada,
+      detalle: rutina.titulo,
     );
   }
 
@@ -543,6 +625,11 @@ class ActividadRepositoryImpl implements ActividadRepository {
         diaMes: diaMes,
         fechaInicio: ahora,
       ),
+    );
+    await _registrarHistorial(
+      actividadId: tareaMensual.id,
+      accion: AccionHistorial.creada,
+      detalle: tareaMensual.titulo,
     );
     return tareaMensual;
   }
@@ -613,17 +700,22 @@ class ActividadRepositoryImpl implements ActividadRepository {
       );
     }
 
-    await _guardarRepeticion(
-      Repeticion(
-        id: repeticion.id,
-        actividadId: tareaMensual.id,
-        tipo: TipoRepeticion.mensual,
-        diaMes: diaMes,
-        intervalo: repeticion.intervalo,
-        fechaInicio: repeticion.fechaInicio,
-        fechaFin: repeticion.fechaFin,
-        reglaTexto: repeticion.reglaTexto,
-      ),
+    final repeticionActualizada = Repeticion(
+      id: repeticion.id,
+      actividadId: tareaMensual.id,
+      tipo: TipoRepeticion.mensual,
+      diaMes: diaMes,
+      intervalo: repeticion.intervalo,
+      fechaInicio: repeticion.fechaInicio,
+      fechaFin: repeticion.fechaFin,
+      reglaTexto: repeticion.reglaTexto,
+    );
+    await _guardarRepeticion(repeticionActualizada);
+    await _registrarEdicionTareaMensual(
+      anterior: existente,
+      actualizada: tareaMensual,
+      repeticionAnterior: repeticion,
+      repeticionActualizada: repeticionActualizada,
     );
   }
 
@@ -643,6 +735,11 @@ class ActividadRepositoryImpl implements ActividadRepository {
         updatedAt: ahora,
         deletedAt: ahora,
       ),
+    );
+    await _registrarHistorial(
+      actividadId: id,
+      accion: AccionHistorial.eliminada,
+      detalle: tarea.titulo,
     );
   }
 
@@ -718,6 +815,13 @@ class ActividadRepositoryImpl implements ActividadRepository {
         updatedAt: ahora,
       ),
     );
+    final actividad = await obtenerPorId(ocurrencia.actividadId);
+    await _registrarHistorial(
+      actividadId: ocurrencia.actividadId,
+      ocurrenciaId: ocurrenciaId,
+      accion: AccionHistorial.ocurrenciaCompletada,
+      detalle: actividad?.titulo,
+    );
   }
 
   @override
@@ -730,6 +834,13 @@ class ActividadRepositoryImpl implements ActividadRepository {
         updatedAt: DateTime.now(),
       ),
     );
+    final actividad = await obtenerPorId(ocurrencia.actividadId);
+    await _registrarHistorial(
+      actividadId: ocurrencia.actividadId,
+      ocurrenciaId: ocurrenciaId,
+      accion: AccionHistorial.ocurrenciaPendiente,
+      detalle: actividad?.titulo,
+    );
   }
 
   @override
@@ -740,7 +851,7 @@ class ActividadRepositoryImpl implements ActividadRepository {
         .map((a) => ElementoVistaTemporal(actividad: a))
         .toList();
     elementos.addAll(await _listarElementosRecurrentesParaHoy(dia));
-    final sinDuplicados = _deduplicarElementosPorActividadYDia(elementos, dia);
+    final sinDuplicados = _deduplicarElementosVista(elementos);
     sinDuplicados.sort(compararElementosVistaTemporal);
     return sinDuplicados;
   }
@@ -760,8 +871,13 @@ class ActividadRepositoryImpl implements ActividadRepository {
         .map((a) => ElementoVistaTemporal(actividad: a))
         .toList();
     elementos.addAll(await _listarElementosRecurrentesProximas(ahora));
-    elementos.sort(compararElementosVistaTemporal);
-    return elementos;
+    final filtrados = elementos
+        .where((e) => !esElementoVencido(e, ahora))
+        .where((e) => esElementoFuturo(e, ahora))
+        .toList();
+    final sinDuplicados = _deduplicarElementosVista(filtrados);
+    sinDuplicados.sort(compararElementosVistaTemporal);
+    return sinDuplicados;
   }
 
   @override
@@ -775,9 +891,63 @@ class ActividadRepositoryImpl implements ActividadRepository {
         .map((a) => ElementoVistaTemporal(actividad: a))
         .toList();
     elementos.addAll(await _listarElementosRecurrentesVencidas(ahora));
-    final sinDuplicados = _deduplicarElementosPorActividadYDia(elementos, ahora);
-    sinDuplicados.sort(compararElementosVistaTemporal);
-    return sinDuplicados;
+    final sinDuplicados = _deduplicarElementosVista(elementos);
+    final vencidas = sinDuplicados
+        .where((e) => esElementoVencido(e, ahora))
+        .toList();
+    vencidas.sort(
+      (a, b) => compararElementosVistaTemporal(a, b, descendente: true),
+    );
+    return vencidas;
+  }
+
+  @override
+  Future<List<HistorialActividad>> listarHistorialReciente({
+    int limite = 50,
+  }) async {
+    const accionesRecientes = {
+      AccionHistorial.creada,
+      AccionHistorial.editada,
+      AccionHistorial.completada,
+      AccionHistorial.eliminada,
+      AccionHistorial.reprogramada,
+    };
+    final query = database.select(database.historialActividades)
+      ..where(
+        (row) => row.accion.isIn(
+          accionesRecientes.map((a) => a.storageValue).toList(),
+        ),
+      )
+      ..orderBy([(row) => OrderingTerm.desc(row.fechaHora)])
+      ..limit(limite);
+
+    final rows = await query.get();
+    return rows.map(HistorialMapper.toDomain).toList();
+  }
+
+  @override
+  Future<List<Actividad>> buscarActividadesActivas(String consulta) async {
+    final termino = consulta.trim().toLowerCase();
+    if (termino.isEmpty) {
+      return [];
+    }
+
+    final tipos = TipoActividad.values.map((t) => t.storageValue).toList();
+    final filas = await (database.select(database.actividades)
+          ..where(
+            (row) => row.deletedAt.isNull() & row.tipo.isIn(tipos),
+          )
+          ..orderBy([(row) => OrderingTerm.asc(row.titulo)]))
+        .get();
+
+    return filas
+        .map(ActividadMapper.toDomain)
+        .where(
+          (a) =>
+              a.titulo.toLowerCase().contains(termino) ||
+              (a.descripcion?.toLowerCase().contains(termino) ?? false),
+        )
+        .toList();
   }
 
   @override
@@ -793,8 +963,9 @@ class ActividadRepositoryImpl implements ActividadRepository {
     elementos.addAll(
       await _listarElementosRecurrentesEnRango(inicio: inicio, fin: fin),
     );
-    elementos.sort(compararElementosVistaTemporal);
-    return elementos;
+    final sinDuplicados = _deduplicarElementosVista(elementos);
+    sinDuplicados.sort(compararElementosVistaTemporal);
+    return sinDuplicados;
   }
 
   @override
@@ -816,6 +987,11 @@ class ActividadRepositoryImpl implements ActividadRepository {
         updatedAt: ahora,
         deletedAt: ahora,
       ),
+    );
+    await _registrarHistorial(
+      actividadId: id,
+      accion: AccionHistorial.eliminada,
+      detalle: recordatorio.titulo,
     );
   }
 
@@ -1045,10 +1221,8 @@ class ActividadRepositoryImpl implements ActividadRepository {
     }
   }
 
-  /// Evita filas repetidas si ya existían duplicados en base de datos.
-  List<ElementoVistaTemporal> _deduplicarElementosPorActividadYDia(
+  List<ElementoVistaTemporal> _deduplicarElementosVista(
     List<ElementoVistaTemporal> elementos,
-    DateTime dia,
   ) {
     final vistos = <String>{};
     final resultado = <ElementoVistaTemporal>[];
@@ -1331,5 +1505,95 @@ class ActividadRepositoryImpl implements ActividadRepository {
     }
     final valor = descripcion.trim();
     return valor.isEmpty ? null : valor;
+  }
+
+  DateTime _siguienteFechaHistorial() {
+    final ahora = DateTime.now();
+    if (_ultimaFechaHistorial == null || !ahora.isAfter(_ultimaFechaHistorial!)) {
+      _ultimaFechaHistorial =
+          (_ultimaFechaHistorial ?? ahora).add(const Duration(seconds: 1));
+    } else {
+      _ultimaFechaHistorial = ahora;
+    }
+    return _ultimaFechaHistorial!;
+  }
+
+  Future<void> _registrarHistorial({
+    String? actividadId,
+    String? ocurrenciaId,
+    required AccionHistorial accion,
+    String? detalle,
+  }) async {
+    final entrada = HistorialActividad(
+      id: _uuid.v4(),
+      actividadId: actividadId,
+      ocurrenciaId: ocurrenciaId,
+      accion: accion,
+      detalle: detalle,
+      fechaHora: _siguienteFechaHistorial(),
+    );
+    await database.into(database.historialActividades).insert(
+          HistorialMapper.toCompanion(entrada),
+        );
+  }
+
+  Future<void> _registrarEdicionActividad({
+    required Actividad anterior,
+    required Actividad actualizada,
+  }) async {
+    if (fechasProgramacionCambiaron(anterior, actualizada)) {
+      await _registrarHistorial(
+        actividadId: actualizada.id,
+        accion: AccionHistorial.reprogramada,
+        detalle: actualizada.titulo,
+      );
+    }
+    await _registrarHistorial(
+      actividadId: actualizada.id,
+      accion: AccionHistorial.editada,
+      detalle: actualizada.titulo,
+    );
+  }
+
+  Future<void> _registrarEdicionRutina({
+    required Actividad anterior,
+    required Actividad actualizada,
+    required Repeticion repeticionAnterior,
+    required Repeticion repeticionActualizada,
+  }) async {
+    final tituloCambio = anterior.titulo != actualizada.titulo ||
+        anterior.descripcion != actualizada.descripcion ||
+        anterior.urgente != actualizada.urgente;
+    final huboCambioRepeticion =
+        repeticionCambio(repeticionAnterior, repeticionActualizada);
+
+    if (huboCambioRepeticion) {
+      await _registrarHistorial(
+        actividadId: actualizada.id,
+        accion: AccionHistorial.reprogramada,
+        detalle: actualizada.titulo,
+      );
+    }
+    if (tituloCambio || huboCambioRepeticion) {
+      await _registrarHistorial(
+        actividadId: actualizada.id,
+        accion: AccionHistorial.editada,
+        detalle: actualizada.titulo,
+      );
+    }
+  }
+
+  Future<void> _registrarEdicionTareaMensual({
+    required Actividad anterior,
+    required Actividad actualizada,
+    required Repeticion repeticionAnterior,
+    required Repeticion repeticionActualizada,
+  }) async {
+    await _registrarEdicionRutina(
+      anterior: anterior,
+      actualizada: actualizada,
+      repeticionAnterior: repeticionAnterior,
+      repeticionActualizada: repeticionActualizada,
+    );
   }
 }

@@ -173,12 +173,13 @@ Soporte inicial para actividades repetitivas.
 Fortalecer consultas, condiciones calculadas e historial.
 
 **Historias o requisitos incluidos**  
-HU-07, HU-08, HU-09, RF-18, RF-19, RF-20, RF-24, RF-25, RF-26, RF-29.
+HU-07, HU-08, HU-09, HU-29, RF-18, RF-19, RF-20, RF-24, RF-25, RF-26, RF-29.
 
 **Tareas técnicas**
 
 - Ajustar reglas de vencimiento calculado.
-- Agregar búsqueda.
+- Agregar búsqueda básica reactiva por título y descripción.
+- Permitir seleccionar un resultado de búsqueda y abrir la actividad correspondiente.
 - Mejorar historial de cambios.
 - Registrar reprogramación como acción de historial.
 - Mejorar ordenamientos.
@@ -189,6 +190,7 @@ HU-07, HU-08, HU-09, RF-18, RF-19, RF-20, RF-24, RF-25, RF-26, RF-29.
 - Las actividades sin fecha no se marcan como vencidas.
 - Reprogramada no se guarda como estado permanente.
 - El historial muestra cambios relevantes.
+- La búsqueda básica debe permitir seleccionar un resultado y abrir la actividad correspondiente.
 
 **Resultado esperado**  
 Sistema más confiable para seguimiento diario.

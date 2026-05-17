@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/entities/elemento_vista_temporal.dart';
 import '../../domain/utils/actividad_temporal.dart';
 import '../../domain/utils/elemento_vista_temporal_utils.dart';
+import '../../domain/utils/ordenamiento_vista_temporal.dart';
 import 'actividad_repository_provider.dart';
 
 /// Días visibles en la agenda básica (hoy + siguientes).
