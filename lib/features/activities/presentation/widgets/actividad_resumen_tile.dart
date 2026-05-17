@@ -2,32 +2,37 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../domain/entities/actividad.dart';
+import '../../domain/entities/elemento_vista_temporal.dart';
 import '../../domain/enums/estado_actividad.dart';
+import '../../domain/enums/estado_ocurrencia.dart';
 import '../../domain/enums/tipo_actividad.dart';
 import '../../domain/utils/actividad_temporal.dart';
-import '../../domain/utils/actividad_vencimiento.dart';
+import '../../domain/utils/elemento_vista_temporal_utils.dart';
+import '../../domain/utils/ocurrencia_vencimiento.dart';
 
 /// Fila reutilizable para vistas temporales (Hoy, Próximas, Vencidas, etc.).
 class ActividadResumenTile extends StatelessWidget {
   const ActividadResumenTile({
     super.key,
-    required this.actividad,
+    required this.elemento,
     this.onTap,
     this.mostrarVencida = true,
   });
 
-  final Actividad actividad;
+  final ElementoVistaTemporal elemento;
   final VoidCallback? onTap;
   final bool mostrarVencida;
 
   static final _fechaFormato = DateFormat('dd/MM/yyyy');
   static final _fechaHoraFormato = DateFormat('dd/MM/yyyy HH:mm');
 
+  Actividad get actividad => elemento.actividad;
+
   @override
   Widget build(BuildContext context) {
-    final completada = actividad.estado == EstadoActividad.completada;
-    final vencida = mostrarVencida &&
-        esActividadVencida(actividad, DateTime.now());
+    final completada = _estaCompletada();
+    final vencida =
+        mostrarVencida && esElementoVencido(elemento, DateTime.now());
 
     return ListTile(
       onTap: onTap,
@@ -52,7 +57,7 @@ class ActividadResumenTile extends StatelessWidget {
         [
           _etiquetaTipo(actividad.tipo),
           completada ? 'Completada' : 'Pendiente',
-          _textoFecha(actividad),
+          _textoFecha(),
           if (vencida) 'Vencida',
         ].join(' · '),
         style: vencida && !completada
@@ -61,6 +66,14 @@ class ActividadResumenTile extends StatelessWidget {
       ),
       isThreeLine: false,
     );
+  }
+
+  bool _estaCompletada() {
+    final ocurrencia = elemento.ocurrencia;
+    if (ocurrencia != null) {
+      return ocurrencia.estadoOcurrencia == EstadoOcurrencia.completada;
+    }
+    return actividad.estado == EstadoActividad.completada;
   }
 
   static String _etiquetaTipo(TipoActividad tipo) {
@@ -78,7 +91,12 @@ class ActividadResumenTile extends StatelessWidget {
     }
   }
 
-  String _textoFecha(Actividad actividad) {
+  String _textoFecha() {
+    final ocurrencia = elemento.ocurrencia;
+    if (ocurrencia != null) {
+      return 'Programada: ${_fechaFormato.format(fechaEfectivaOcurrencia(ocurrencia))}';
+    }
+
     switch (actividad.tipo) {
       case TipoActividad.tarea:
         if (actividad.fechaLimite == null) {

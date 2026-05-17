@@ -40,6 +40,8 @@ enum AppSection {
   tareas('Tareas', '/tareas'),
   recordatorios('Recordatorios', '/recordatorios'),
   eventos('Eventos', '/eventos'),
+  rutinas('Rutinas', '/rutinas'),
+  tareasMensuales('Tareas mensuales', '/tareas-mensuales'),
   hoy('Hoy', '/hoy'),
   proximas('Próximas', '/proximas'),
   vencidas('Vencidas', '/vencidas'),

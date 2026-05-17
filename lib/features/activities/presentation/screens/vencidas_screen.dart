@@ -41,7 +41,7 @@ class VencidasScreen extends ConsumerWidget {
               itemCount: actividades.length,
               separatorBuilder: (context, index) => const Divider(height: 1),
               itemBuilder: (context, index) {
-                return ActividadResumenTile(actividad: actividades[index]);
+                return ActividadResumenTile(elemento: actividades[index]);
               },
             );
           },

@@ -1,19 +1,20 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../domain/entities/actividad.dart';
+import '../../domain/entities/elemento_vista_temporal.dart';
 import 'actividad_repository_provider.dart';
 
-final vencidasProvider = AsyncNotifierProvider<VencidasNotifier, List<Actividad>>(
+final vencidasProvider =
+    AsyncNotifierProvider<VencidasNotifier, List<ElementoVistaTemporal>>(
   VencidasNotifier.new,
 );
 
-class VencidasNotifier extends AsyncNotifier<List<Actividad>> {
+class VencidasNotifier extends AsyncNotifier<List<ElementoVistaTemporal>> {
   @override
-  Future<List<Actividad>> build() async {
+  Future<List<ElementoVistaTemporal>> build() async {
     return _cargar();
   }
 
-  Future<List<Actividad>> _cargar() async {
+  Future<List<ElementoVistaTemporal>> _cargar() async {
     final repository = ref.read(actividadRepositoryProvider);
     return repository.listarVencidas();
   }

@@ -47,8 +47,14 @@ void main() {
 
     final delDia = await repository.listarParaHoy(hoy);
 
-    expect(delDia.map((a) => a.titulo), containsAll(['Tarea hoy', 'Recordatorio hoy', 'Evento hoy']));
-    expect(delDia.map((a) => a.titulo), isNot(contains('Tarea mañana')));
+    expect(
+      delDia.map((e) => e.actividad.titulo),
+      containsAll(['Tarea hoy', 'Recordatorio hoy', 'Evento hoy']),
+    );
+    expect(
+      delDia.map((e) => e.actividad.titulo),
+      isNot(contains('Tarea mañana')),
+    );
   });
 
   test('obtener próximas actividades ordenadas', () async {
@@ -78,7 +84,7 @@ void main() {
 
     final proximas = await repository.listarProximas(referencia: referencia);
 
-    expect(proximas.map((a) => a.titulo).toList(), [
+    expect(proximas.map((e) => e.actividad.titulo).toList(), [
       'Tarea cercana',
       'Recordatorio futuro',
       'Tarea lejana',
@@ -139,7 +145,13 @@ void main() {
       fin: DateTime(2026, 5, 19, 23, 59, 59, 999),
     );
 
-    expect(enRango.map((a) => a.titulo), containsAll(['En rango', 'Evento cruzado']));
-    expect(enRango.map((a) => a.titulo), isNot(contains('Fuera de rango')));
+    expect(
+      enRango.map((e) => e.actividad.titulo),
+      containsAll(['En rango', 'Evento cruzado']),
+    );
+    expect(
+      enRango.map((e) => e.actividad.titulo),
+      isNot(contains('Fuera de rango')),
+    );
   });
 }

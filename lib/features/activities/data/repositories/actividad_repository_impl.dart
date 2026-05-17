@@ -7,24 +7,34 @@ import '../../../../shared/services/notifications/notification_ids.dart';
 import '../../../../core/errors/validation_exception.dart';
 import '../../../../shared/services/notifications/local_notifications_service.dart';
 import '../../domain/entities/actividad.dart';
+import '../../domain/entities/elemento_vista_temporal.dart';
+import '../../domain/entities/ocurrencia_actividad.dart';
+import '../../domain/entities/repeticion.dart';
 import '../../domain/enums/estado_actividad.dart';
+import '../../domain/enums/estado_ocurrencia.dart';
 import '../../domain/enums/tipo_actividad.dart';
+import '../../domain/enums/tipo_repeticion.dart';
 import '../../domain/repositories/actividad_repository.dart';
 import '../../domain/utils/actividad_temporal.dart';
 import '../../domain/utils/actividad_vencimiento.dart';
+import '../../domain/utils/elemento_vista_temporal_utils.dart';
+import '../../domain/utils/ocurrencia_vencimiento.dart';
+import '../../domain/utils/repeticion_utils.dart';
 import '../local/database.dart';
 import '../mappers/actividad_mapper.dart';
+import '../mappers/ocurrencia_mapper.dart';
+import '../mappers/repeticion_mapper.dart';
 
 class ActividadRepositoryImpl implements ActividadRepository {
-  ActividadRepositoryImpl(this._database, this._notifications);
+  ActividadRepositoryImpl(this.database, this._notifications);
 
-  final AppDatabase _database;
+  final AppDatabase database;
   final LocalNotificationsService _notifications;
   static const _uuid = Uuid();
 
   @override
   Future<List<Actividad>> obtenerActivas() async {
-    final query = _database.select(_database.actividades)
+    final query = database.select(database.actividades)
       ..where((row) => row.deletedAt.isNull())
       ..orderBy([(row) => OrderingTerm.desc(row.updatedAt)]);
 
@@ -34,7 +44,7 @@ class ActividadRepositoryImpl implements ActividadRepository {
 
   @override
   Future<List<Actividad>> listarTareasActivas() async {
-    final query = _database.select(_database.actividades)
+    final query = database.select(database.actividades)
       ..where(
         (row) =>
             row.deletedAt.isNull() &
@@ -48,7 +58,7 @@ class ActividadRepositoryImpl implements ActividadRepository {
 
   @override
   Future<List<Actividad>> listarRecordatoriosActivos() async {
-    final query = _database.select(_database.actividades)
+    final query = database.select(database.actividades)
       ..where(
         (row) =>
             row.deletedAt.isNull() &
@@ -62,7 +72,7 @@ class ActividadRepositoryImpl implements ActividadRepository {
 
   @override
   Future<Actividad?> obtenerPorId(String id) async {
-    final query = _database.select(_database.actividades)
+    final query = database.select(database.actividades)
       ..where((row) => row.id.equals(id) & row.deletedAt.isNull());
 
     final row = await query.getSingleOrNull();
@@ -86,7 +96,7 @@ class ActividadRepositoryImpl implements ActividadRepository {
 
   @override
   Future<void> guardar(Actividad actividad) async {
-    await _database.into(_database.actividades).insertOnConflictUpdate(
+    await database.into(database.actividades).insertOnConflictUpdate(
           ActividadMapper.toCompanion(actividad),
         );
   }
@@ -276,7 +286,7 @@ class ActividadRepositoryImpl implements ActividadRepository {
 
   @override
   Future<List<Actividad>> listarEventosActivos() async {
-    final query = _database.select(_database.actividades)
+    final query = database.select(database.actividades)
       ..where(
         (row) =>
             row.deletedAt.isNull() &
@@ -358,48 +368,433 @@ class ActividadRepositoryImpl implements ActividadRepository {
   }
 
   @override
-  Future<List<Actividad>> listarParaHoy(DateTime dia) async {
-    final activas = await _listarActivasVistasTemporales();
-    final delDia = activas.where((a) => correspondeAlDia(a, dia)).toList();
-    delDia.sort(compararPorFechaOrdenacion);
-    return delDia;
+  Future<Actividad> crearRutina({
+    required String titulo,
+    String? descripcion,
+    required List<int> diasSemana,
+    bool todosLosDias = false,
+    bool urgente = false,
+  }) async {
+    _validarTituloRutina(titulo);
+    if (!todosLosDias && diasSemana.isEmpty) {
+      throw const ValidationException(
+        'Debes indicar al menos un día de la semana o marcar todos los días.',
+      );
+    }
+
+    final ahora = DateTime.now();
+    final rutina = Actividad(
+      id: _uuid.v4(),
+      tipo: TipoActividad.rutina,
+      titulo: titulo.trim(),
+      descripcion: _descripcionNormalizada(descripcion),
+      estado: EstadoActividad.pendiente,
+      urgente: urgente,
+      createdAt: ahora,
+      updatedAt: ahora,
+    );
+    await guardar(rutina);
+
+    await _guardarRepeticion(
+      Repeticion(
+        id: _uuid.v4(),
+        actividadId: rutina.id,
+        tipo: todosLosDias ? TipoRepeticion.diaria : TipoRepeticion.semanal,
+        diasSemana: todosLosDias ? null : diasSemana,
+        fechaInicio: ahora,
+      ),
+    );
+    return rutina;
   }
 
   @override
-  Future<List<Actividad>> listarProximas({DateTime? referencia}) async {
+  Future<List<Actividad>> listarRutinasActivas() async {
+    final query = database.select(database.actividades)
+      ..where(
+        (row) =>
+            row.deletedAt.isNull() &
+            row.tipo.equals(TipoActividad.rutina.storageValue),
+      )
+      ..orderBy([(row) => OrderingTerm.asc(row.titulo)]);
+
+    final rows = await query.get();
+    return rows.map(ActividadMapper.toDomain).toList();
+  }
+
+  @override
+  Future<Actividad?> obtenerRutinaPorId(String id) async {
+    final rutina = await obtenerPorId(id);
+    if (rutina == null) {
+      return null;
+    }
+    if (rutina.tipo != TipoActividad.rutina) {
+      throw const ValidationException('El registro no es una rutina.');
+    }
+    return rutina;
+  }
+
+  @override
+  Future<Repeticion?> obtenerRepeticionPorActividadId(String actividadId) async {
+    final query = database.select(database.repeticiones)
+      ..where((row) => row.actividadId.equals(actividadId))
+      ..orderBy([(row) => OrderingTerm.desc(row.id)]);
+
+    final rows = await query.get();
+    if (rows.isEmpty) {
+      return null;
+    }
+    return RepeticionMapper.toDomain(rows.first);
+  }
+
+  @override
+  Future<void> editarRutina({
+    required Actividad rutina,
+    required List<int> diasSemana,
+    bool todosLosDias = false,
+  }) async {
+    _validarRutinaEdicion(rutina, diasSemana, todosLosDias);
+
+    final existente = await obtenerRutinaPorId(rutina.id);
+    if (existente == null) {
+      throw const ValidationException('La rutina no existe o fue eliminada.');
+    }
+
+    await guardar(
+      Actividad(
+        id: rutina.id,
+        tipo: TipoActividad.rutina,
+        titulo: rutina.titulo.trim(),
+        descripcion: _descripcionNormalizada(rutina.descripcion),
+        estado: EstadoActividad.pendiente,
+        urgente: rutina.urgente,
+        createdAt: existente.createdAt,
+        updatedAt: DateTime.now(),
+        deletedAt: existente.deletedAt,
+      ),
+    );
+
+    final repeticionExistente =
+        await obtenerRepeticionPorActividadId(rutina.id);
+    if (repeticionExistente == null) {
+      throw const ValidationException('La rutina no tiene repetición asociada.');
+    }
+
+    await _guardarRepeticion(
+      Repeticion(
+        id: repeticionExistente.id,
+        actividadId: rutina.id,
+        tipo: todosLosDias ? TipoRepeticion.diaria : TipoRepeticion.semanal,
+        diasSemana: todosLosDias ? null : diasSemana,
+        intervalo: repeticionExistente.intervalo,
+        fechaInicio: repeticionExistente.fechaInicio,
+        fechaFin: repeticionExistente.fechaFin,
+        reglaTexto: repeticionExistente.reglaTexto,
+      ),
+    );
+  }
+
+  @override
+  Future<void> eliminarRutinaLogicamente(String id) async {
+    final rutina = await _obtenerRutina(id);
+    final ahora = DateTime.now();
+    await guardar(
+      Actividad(
+        id: rutina.id,
+        tipo: rutina.tipo,
+        titulo: rutina.titulo,
+        descripcion: rutina.descripcion,
+        estado: rutina.estado,
+        urgente: rutina.urgente,
+        createdAt: rutina.createdAt,
+        updatedAt: ahora,
+        deletedAt: ahora,
+      ),
+    );
+  }
+
+  @override
+  Future<Actividad> crearTareaMensual({
+    required String titulo,
+    String? descripcion,
+    required int diaMes,
+    bool urgente = false,
+  }) async {
+    _validarTituloRutina(titulo);
+    _validarDiaMes(diaMes);
+
+    final ahora = DateTime.now();
+    final tareaMensual = Actividad(
+      id: _uuid.v4(),
+      tipo: TipoActividad.tareaMensual,
+      titulo: titulo.trim(),
+      descripcion: _descripcionNormalizada(descripcion),
+      estado: EstadoActividad.pendiente,
+      urgente: urgente,
+      createdAt: ahora,
+      updatedAt: ahora,
+    );
+    await guardar(tareaMensual);
+
+    await _guardarRepeticion(
+      Repeticion(
+        id: _uuid.v4(),
+        actividadId: tareaMensual.id,
+        tipo: TipoRepeticion.mensual,
+        diaMes: diaMes,
+        fechaInicio: ahora,
+      ),
+    );
+    return tareaMensual;
+  }
+
+  @override
+  Future<List<Actividad>> listarTareasMensualesActivas() async {
+    final query = database.select(database.actividades)
+      ..where(
+        (row) =>
+            row.deletedAt.isNull() &
+            row.tipo.equals(TipoActividad.tareaMensual.storageValue),
+      )
+      ..orderBy([(row) => OrderingTerm.asc(row.titulo)]);
+
+    final rows = await query.get();
+    return rows.map(ActividadMapper.toDomain).toList();
+  }
+
+  @override
+  Future<Actividad?> obtenerTareaMensualPorId(String id) async {
+    final tarea = await obtenerPorId(id);
+    if (tarea == null) {
+      return null;
+    }
+    if (tarea.tipo != TipoActividad.tareaMensual) {
+      throw const ValidationException('El registro no es una tarea mensual.');
+    }
+    return tarea;
+  }
+
+  @override
+  Future<void> editarTareaMensual({
+    required Actividad tareaMensual,
+    required int diaMes,
+  }) async {
+    if (tareaMensual.tipo != TipoActividad.tareaMensual) {
+      throw const ValidationException('No es una tarea mensual.');
+    }
+    _validarTituloRutina(tareaMensual.titulo);
+    _validarDiaMes(diaMes);
+
+    final existente = await obtenerTareaMensualPorId(tareaMensual.id);
+    if (existente == null) {
+      throw const ValidationException(
+        'La tarea mensual no existe o fue eliminada.',
+      );
+    }
+
+    await guardar(
+      Actividad(
+        id: tareaMensual.id,
+        tipo: TipoActividad.tareaMensual,
+        titulo: tareaMensual.titulo.trim(),
+        descripcion: _descripcionNormalizada(tareaMensual.descripcion),
+        estado: EstadoActividad.pendiente,
+        urgente: tareaMensual.urgente,
+        createdAt: existente.createdAt,
+        updatedAt: DateTime.now(),
+        deletedAt: existente.deletedAt,
+      ),
+    );
+
+    final repeticion =
+        await obtenerRepeticionPorActividadId(tareaMensual.id);
+    if (repeticion == null) {
+      throw const ValidationException(
+        'La tarea mensual no tiene repetición asociada.',
+      );
+    }
+
+    await _guardarRepeticion(
+      Repeticion(
+        id: repeticion.id,
+        actividadId: tareaMensual.id,
+        tipo: TipoRepeticion.mensual,
+        diaMes: diaMes,
+        intervalo: repeticion.intervalo,
+        fechaInicio: repeticion.fechaInicio,
+        fechaFin: repeticion.fechaFin,
+        reglaTexto: repeticion.reglaTexto,
+      ),
+    );
+  }
+
+  @override
+  Future<void> eliminarTareaMensualLogicamente(String id) async {
+    final tarea = await _obtenerTareaMensual(id);
+    final ahora = DateTime.now();
+    await guardar(
+      Actividad(
+        id: tarea.id,
+        tipo: tarea.tipo,
+        titulo: tarea.titulo,
+        descripcion: tarea.descripcion,
+        estado: tarea.estado,
+        urgente: tarea.urgente,
+        createdAt: tarea.createdAt,
+        updatedAt: ahora,
+        deletedAt: ahora,
+      ),
+    );
+  }
+
+  @override
+  Future<OcurrenciaActividad?> obtenerOcurrenciaParaDia({
+    required String actividadId,
+    required DateTime dia,
+  }) async {
+    final repeticion = await obtenerRepeticionPorActividadId(actividadId);
+    if (repeticion == null) {
+      return null;
+    }
+    final fechaProgramada = fechaProgramadaParaDia(repeticion, dia);
+    final inicio = inicioDelDia(fechaProgramada);
+    final fin = finDelDia(fechaProgramada);
+    final query = database.select(database.ocurrenciasActividades)
+      ..where(
+        (row) =>
+            row.actividadId.equals(actividadId) &
+            row.fechaProgramada.isBiggerOrEqualValue(inicio) &
+            row.fechaProgramada.isSmallerOrEqualValue(fin),
+      )
+      ..orderBy([(row) => OrderingTerm.desc(row.updatedAt)]);
+
+    final rows = await query.get();
+    if (rows.isEmpty) {
+      return null;
+    }
+    return OcurrenciaMapper.toDomain(rows.first);
+  }
+
+  @override
+  Future<OcurrenciaActividad> obtenerOCrearOcurrenciaParaDia({
+    required String actividadId,
+    required DateTime dia,
+  }) async {
+    final existente = await obtenerOcurrenciaParaDia(
+      actividadId: actividadId,
+      dia: dia,
+    );
+    if (existente != null) {
+      return existente;
+    }
+
+    final repeticion = await obtenerRepeticionPorActividadId(actividadId);
+    if (repeticion == null) {
+      throw const ValidationException(
+        'La actividad no tiene repetición asociada.',
+      );
+    }
+
+    final ahora = DateTime.now();
+    final ocurrencia = OcurrenciaActividad(
+      id: _uuid.v4(),
+      actividadId: actividadId,
+      fechaProgramada: fechaProgramadaParaDia(repeticion, dia),
+      estadoOcurrencia: EstadoOcurrencia.pendiente,
+      createdAt: ahora,
+      updatedAt: ahora,
+    );
+    await _guardarOcurrencia(ocurrencia);
+    return ocurrencia;
+  }
+
+  @override
+  Future<void> marcarOcurrenciaCompletada(String ocurrenciaId) async {
+    final ocurrencia = await _obtenerOcurrencia(ocurrenciaId);
+    final ahora = DateTime.now();
+    await _guardarOcurrencia(
+      ocurrencia.copyWith(
+        estadoOcurrencia: EstadoOcurrencia.completada,
+        completedAt: ahora,
+        updatedAt: ahora,
+      ),
+    );
+  }
+
+  @override
+  Future<void> marcarOcurrenciaPendiente(String ocurrenciaId) async {
+    final ocurrencia = await _obtenerOcurrencia(ocurrenciaId);
+    await _guardarOcurrencia(
+      ocurrencia.copyWith(
+        estadoOcurrencia: EstadoOcurrencia.pendiente,
+        completedAt: null,
+        updatedAt: DateTime.now(),
+      ),
+    );
+  }
+
+  @override
+  Future<List<ElementoVistaTemporal>> listarParaHoy(DateTime dia) async {
+    final activas = await _listarActivasVistasTemporales();
+    final elementos = activas
+        .where((a) => correspondeAlDia(a, dia))
+        .map((a) => ElementoVistaTemporal(actividad: a))
+        .toList();
+    elementos.addAll(await _listarElementosRecurrentesParaHoy(dia));
+    final sinDuplicados = _deduplicarElementosPorActividadYDia(elementos, dia);
+    sinDuplicados.sort(compararElementosVistaTemporal);
+    return sinDuplicados;
+  }
+
+  @override
+  Future<List<ElementoVistaTemporal>> listarProximas({
+    DateTime? referencia,
+  }) async {
     final ahora = referencia ?? DateTime.now();
     final activas = await _listarActivasVistasTemporales();
-    final futuras = activas
+    final elementos = activas
         .where(
           (a) =>
               a.estado == EstadoActividad.pendiente &&
               esActividadFutura(a, ahora),
         )
+        .map((a) => ElementoVistaTemporal(actividad: a))
         .toList();
-    futuras.sort(compararPorFechaOrdenacion);
-    return futuras;
+    elementos.addAll(await _listarElementosRecurrentesProximas(ahora));
+    elementos.sort(compararElementosVistaTemporal);
+    return elementos;
   }
 
   @override
-  Future<List<Actividad>> listarVencidas({DateTime? referencia}) async {
+  Future<List<ElementoVistaTemporal>> listarVencidas({
+    DateTime? referencia,
+  }) async {
     final ahora = referencia ?? DateTime.now();
     final activas = await _listarActivasVistasTemporales();
-    final vencidas =
-        activas.where((a) => esActividadVencida(a, ahora)).toList();
-    vencidas.sort(compararPorFechaOrdenacion);
-    return vencidas;
+    final elementos = activas
+        .where((a) => esActividadVencida(a, ahora))
+        .map((a) => ElementoVistaTemporal(actividad: a))
+        .toList();
+    elementos.addAll(await _listarElementosRecurrentesVencidas(ahora));
+    final sinDuplicados = _deduplicarElementosPorActividadYDia(elementos, ahora);
+    sinDuplicados.sort(compararElementosVistaTemporal);
+    return sinDuplicados;
   }
 
   @override
-  Future<List<Actividad>> listarPorRangoFechas({
+  Future<List<ElementoVistaTemporal>> listarPorRangoFechas({
     required DateTime inicio,
     required DateTime fin,
   }) async {
     final activas = await _listarActivasVistasTemporales();
-    final enRango =
-        activas.where((a) => intersectaRango(a, inicio, fin)).toList();
-    enRango.sort(compararPorFechaOrdenacion);
-    return enRango;
+    final elementos = activas
+        .where((a) => intersectaRango(a, inicio, fin))
+        .map((a) => ElementoVistaTemporal(actividad: a))
+        .toList();
+    elementos.addAll(
+      await _listarElementosRecurrentesEnRango(inicio: inicio, fin: fin),
+    );
+    elementos.sort(compararElementosVistaTemporal);
+    return elementos;
   }
 
   @override
@@ -512,7 +907,7 @@ class ActividadRepositoryImpl implements ActividadRepository {
       TipoActividad.recordatorio.storageValue,
       TipoActividad.evento.storageValue,
     ];
-    final query = _database.select(_database.actividades)
+    final query = database.select(database.actividades)
       ..where(
         (row) => row.deletedAt.isNull() & row.tipo.isIn(tipos),
       );
@@ -646,6 +1041,286 @@ class ActividadRepositoryImpl implements ActividadRepository {
     if (!fechaFin.isAfter(fechaInicio)) {
       throw const ValidationException(
         'La fecha de fin debe ser posterior a la de inicio.',
+      );
+    }
+  }
+
+  /// Evita filas repetidas si ya existían duplicados en base de datos.
+  List<ElementoVistaTemporal> _deduplicarElementosPorActividadYDia(
+    List<ElementoVistaTemporal> elementos,
+    DateTime dia,
+  ) {
+    final vistos = <String>{};
+    final resultado = <ElementoVistaTemporal>[];
+    for (final elemento in elementos) {
+      final clave = elemento.ocurrencia != null
+          ? '${elemento.actividad.id}_'
+              '${inicioDelDia(fechaEfectivaOcurrencia(elemento.ocurrencia!)).toIso8601String()}'
+          : elemento.actividad.id;
+      if (vistos.add(clave)) {
+        resultado.add(elemento);
+      }
+    }
+    return resultado;
+  }
+
+  Future<List<ElementoVistaTemporal>> _listarElementosRecurrentesParaHoy(
+    DateTime dia,
+  ) async {
+    final elementos = <ElementoVistaTemporal>[];
+    final recurrentes = await _listarActividadesRecurrentesActivas();
+
+    for (final actividad in recurrentes) {
+      final repeticion = await obtenerRepeticionPorActividadId(actividad.id);
+      if (repeticion == null ||
+          !diaAplicaParaActividadRecurrente(repeticion, actividad.createdAt, dia)) {
+        continue;
+      }
+      final ocurrencia = await obtenerOCrearOcurrenciaParaDia(
+        actividadId: actividad.id,
+        dia: dia,
+      );
+      if (!ocurrenciaVisibleEnVistas(ocurrencia)) {
+        continue;
+      }
+      elementos.add(
+        ElementoVistaTemporal(actividad: actividad, ocurrencia: ocurrencia),
+      );
+    }
+    return elementos;
+  }
+
+  Future<List<ElementoVistaTemporal>> _listarElementosRecurrentesProximas(
+    DateTime referencia,
+  ) async {
+    final elementos = <ElementoVistaTemporal>[];
+    final recurrentes = await _listarActividadesRecurrentesActivas();
+    final finRango = referencia.add(const Duration(days: 60));
+
+    for (final actividad in recurrentes) {
+      final repeticion = await obtenerRepeticionPorActividadId(actividad.id);
+      if (repeticion == null) {
+        continue;
+      }
+      final fechaMinima = fechaMinimaGeneracionOcurrencias(
+        repeticion,
+        actividad.createdAt,
+      );
+      var cursor = inicioDelDia(referencia);
+      if (cursor.isBefore(fechaMinima)) {
+        cursor = fechaMinima;
+      }
+      final limite = inicioDelDia(finRango);
+      while (!cursor.isAfter(limite)) {
+        if (diaAplicaParaActividadRecurrente(
+          repeticion,
+          actividad.createdAt,
+          cursor,
+        )) {
+          final ocurrencia = await obtenerOCrearOcurrenciaParaDia(
+            actividadId: actividad.id,
+            dia: cursor,
+          );
+          final elemento = ElementoVistaTemporal(
+            actividad: actividad,
+            ocurrencia: ocurrencia,
+          );
+          if (esElementoFuturo(elemento, referencia)) {
+            elementos.add(elemento);
+          }
+        }
+        cursor = cursor.add(const Duration(days: 1));
+      }
+    }
+    return elementos;
+  }
+
+  Future<List<ElementoVistaTemporal>> _listarElementosRecurrentesVencidas(
+    DateTime referencia,
+  ) async {
+    final elementos = <ElementoVistaTemporal>[];
+    final recurrentes = await _listarActividadesRecurrentesActivas();
+    final finExclusivo = inicioDelDia(referencia);
+
+    for (final actividad in recurrentes) {
+      final repeticion = await obtenerRepeticionPorActividadId(actividad.id);
+      if (repeticion == null) {
+        continue;
+      }
+      final fechaMinima = fechaMinimaGeneracionOcurrencias(
+        repeticion,
+        actividad.createdAt,
+      );
+      var cursor = fechaMinima;
+      while (cursor.isBefore(finExclusivo)) {
+        if (diaAplicaParaActividadRecurrente(
+          repeticion,
+          actividad.createdAt,
+          cursor,
+        )) {
+          final fechaProg = fechaProgramadaParaDia(repeticion, cursor);
+          if (inicioDelDia(fechaProg).isBefore(fechaMinima)) {
+            cursor = cursor.add(const Duration(days: 1));
+            continue;
+          }
+          final ocurrencia = await obtenerOcurrenciaParaDia(
+            actividadId: actividad.id,
+            dia: cursor,
+          );
+          if (ocurrencia != null &&
+              inicioDelDia(fechaEfectivaOcurrencia(ocurrencia)).isBefore(fechaMinima)) {
+            cursor = cursor.add(const Duration(days: 1));
+            continue;
+          }
+          if (esOcurrenciaRecurrenteVencida(
+            ocurrencia: ocurrencia,
+            fechaProgramada: fechaProg,
+            referencia: referencia,
+          )) {
+            final ocurrenciaVista = ocurrencia ??
+                OcurrenciaActividad(
+                  id: 'vista-${actividad.id}-${fechaProg.millisecondsSinceEpoch}',
+                  actividadId: actividad.id,
+                  fechaProgramada: fechaProg,
+                  estadoOcurrencia: EstadoOcurrencia.pendiente,
+                  createdAt: actividad.createdAt,
+                  updatedAt: actividad.createdAt,
+                );
+            elementos.add(
+              ElementoVistaTemporal(
+                actividad: actividad,
+                ocurrencia: ocurrenciaVista,
+              ),
+            );
+          }
+        }
+        cursor = cursor.add(const Duration(days: 1));
+      }
+    }
+    return elementos;
+  }
+
+  Future<List<ElementoVistaTemporal>> _listarElementosRecurrentesEnRango({
+    required DateTime inicio,
+    required DateTime fin,
+  }) async {
+    final elementos = <ElementoVistaTemporal>[];
+    final recurrentes = await _listarActividadesRecurrentesActivas();
+    var cursor = inicioDelDia(inicio);
+    final limite = finDelDia(fin);
+
+    while (!cursor.isAfter(limite)) {
+      for (final actividad in recurrentes) {
+        final repeticion = await obtenerRepeticionPorActividadId(actividad.id);
+        if (repeticion == null ||
+            !diaAplicaParaActividadRecurrente(
+              repeticion,
+              actividad.createdAt,
+              cursor,
+            )) {
+          continue;
+        }
+        final ocurrencia = await obtenerOCrearOcurrenciaParaDia(
+          actividadId: actividad.id,
+          dia: cursor,
+        );
+        if (!ocurrenciaVisibleEnVistas(ocurrencia)) {
+          continue;
+        }
+        final elemento = ElementoVistaTemporal(
+          actividad: actividad,
+          ocurrencia: ocurrencia,
+        );
+        if (elementoIntersectaRango(elemento, inicio, fin)) {
+          elementos.add(elemento);
+        }
+      }
+      cursor = cursor.add(const Duration(days: 1));
+    }
+    return elementos;
+  }
+
+  Future<void> _guardarRepeticion(Repeticion repeticion) async {
+    await database.into(database.repeticiones).insertOnConflictUpdate(
+          RepeticionMapper.toCompanion(repeticion),
+        );
+  }
+
+  Future<void> _guardarOcurrencia(OcurrenciaActividad ocurrencia) async {
+    await database.into(database.ocurrenciasActividades).insertOnConflictUpdate(
+          OcurrenciaMapper.toCompanion(ocurrencia),
+        );
+  }
+
+  Future<List<Actividad>> _listarActividadesRecurrentesActivas() async {
+    final tipos = [
+      TipoActividad.rutina.storageValue,
+      TipoActividad.tareaMensual.storageValue,
+    ];
+    final query = database.select(database.actividades)
+      ..where(
+        (row) => row.deletedAt.isNull() & row.tipo.isIn(tipos),
+      );
+
+    final rows = await query.get();
+    return rows.map(ActividadMapper.toDomain).toList();
+  }
+
+  Future<OcurrenciaActividad> _obtenerOcurrencia(String id) async {
+    final query = database.select(database.ocurrenciasActividades)
+      ..where((row) => row.id.equals(id));
+
+    final row = await query.getSingleOrNull();
+    if (row == null) {
+      throw const ValidationException('La ocurrencia no existe.');
+    }
+    return OcurrenciaMapper.toDomain(row);
+  }
+
+  Future<Actividad> _obtenerRutina(String id) async {
+    final rutina = await obtenerRutinaPorId(id);
+    if (rutina == null) {
+      throw const ValidationException('La rutina no existe o fue eliminada.');
+    }
+    return rutina;
+  }
+
+  Future<Actividad> _obtenerTareaMensual(String id) async {
+    final tarea = await obtenerTareaMensualPorId(id);
+    if (tarea == null) {
+      throw const ValidationException(
+        'La tarea mensual no existe o fue eliminada.',
+      );
+    }
+    return tarea;
+  }
+
+  void _validarTituloRutina(String titulo) {
+    if (titulo.trim().isEmpty) {
+      throw const ValidationException('El título es obligatorio.');
+    }
+  }
+
+  void _validarDiaMes(int diaMes) {
+    if (diaMes < 1 || diaMes > 31) {
+      throw const ValidationException(
+        'El día del mes debe estar entre 1 y 31.',
+      );
+    }
+  }
+
+  void _validarRutinaEdicion(
+    Actividad rutina,
+    List<int> diasSemana,
+    bool todosLosDias,
+  ) {
+    if (rutina.tipo != TipoActividad.rutina) {
+      throw const ValidationException('No es una rutina.');
+    }
+    _validarTituloRutina(rutina.titulo);
+    if (!todosLosDias && diasSemana.isEmpty) {
+      throw const ValidationException(
+        'Debes indicar al menos un día de la semana o marcar todos los días.',
       );
     }
   }

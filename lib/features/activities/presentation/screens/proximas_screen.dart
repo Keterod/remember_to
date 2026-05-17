@@ -42,7 +42,7 @@ class ProximasScreen extends ConsumerWidget {
               separatorBuilder: (context, index) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 return ActividadResumenTile(
-                  actividad: actividades[index],
+                  elemento: actividades[index],
                   mostrarVencida: false,
                 );
               },

@@ -9,7 +9,11 @@ import '../../features/activities/presentation/screens/hoy_screen.dart';
 import '../../features/activities/presentation/screens/proximas_screen.dart';
 import '../../features/activities/presentation/screens/recordatorio_form_screen.dart';
 import '../../features/activities/presentation/screens/recordatorios_list_screen.dart';
+import '../../features/activities/presentation/screens/rutina_form_screen.dart';
+import '../../features/activities/presentation/screens/rutinas_list_screen.dart';
 import '../../features/activities/presentation/screens/tarea_form_screen.dart';
+import '../../features/activities/presentation/screens/tarea_mensual_form_screen.dart';
+import '../../features/activities/presentation/screens/tareas_mensuales_list_screen.dart';
 import '../../features/activities/presentation/screens/tareas_list_screen.dart';
 import '../../features/activities/presentation/screens/vencidas_screen.dart';
 
@@ -59,6 +63,34 @@ class AppRouter {
         path: '/eventos/:id/editar',
         builder: (context, state) => EventoFormScreen(
           eventoId: state.pathParameters['id'],
+        ),
+      ),
+      GoRoute(
+        path: '/rutinas',
+        builder: (context, state) => const RutinasListScreen(),
+      ),
+      GoRoute(
+        path: '/rutinas/nueva',
+        builder: (context, state) => const RutinaFormScreen(),
+      ),
+      GoRoute(
+        path: '/rutinas/:id/editar',
+        builder: (context, state) => RutinaFormScreen(
+          rutinaId: state.pathParameters['id'],
+        ),
+      ),
+      GoRoute(
+        path: '/tareas-mensuales',
+        builder: (context, state) => const TareasMensualesListScreen(),
+      ),
+      GoRoute(
+        path: '/tareas-mensuales/nueva',
+        builder: (context, state) => const TareaMensualFormScreen(),
+      ),
+      GoRoute(
+        path: '/tareas-mensuales/:id/editar',
+        builder: (context, state) => TareaMensualFormScreen(
+          tareaMensualId: state.pathParameters['id'],
         ),
       ),
       GoRoute(

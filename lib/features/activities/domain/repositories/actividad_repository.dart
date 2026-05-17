@@ -1,4 +1,7 @@
 import '../entities/actividad.dart';
+import '../entities/elemento_vista_temporal.dart';
+import '../entities/ocurrencia_actividad.dart';
+import '../entities/repeticion.dart';
 
 /// Contrato de persistencia para actividades y tareas.
 abstract class ActividadRepository {
@@ -60,13 +63,67 @@ abstract class ActividadRepository {
 
   Future<void> marcarEventoPendiente(String id);
 
-  Future<List<Actividad>> listarParaHoy(DateTime dia);
+  Future<Actividad> crearRutina({
+    required String titulo,
+    String? descripcion,
+    required List<int> diasSemana,
+    bool todosLosDias = false,
+    bool urgente = false,
+  });
 
-  Future<List<Actividad>> listarProximas({DateTime? referencia});
+  Future<List<Actividad>> listarRutinasActivas();
 
-  Future<List<Actividad>> listarVencidas({DateTime? referencia});
+  Future<Actividad?> obtenerRutinaPorId(String id);
 
-  Future<List<Actividad>> listarPorRangoFechas({
+  Future<Repeticion?> obtenerRepeticionPorActividadId(String actividadId);
+
+  Future<void> editarRutina({
+    required Actividad rutina,
+    required List<int> diasSemana,
+    bool todosLosDias = false,
+  });
+
+  Future<void> eliminarRutinaLogicamente(String id);
+
+  Future<Actividad> crearTareaMensual({
+    required String titulo,
+    String? descripcion,
+    required int diaMes,
+    bool urgente = false,
+  });
+
+  Future<List<Actividad>> listarTareasMensualesActivas();
+
+  Future<Actividad?> obtenerTareaMensualPorId(String id);
+
+  Future<void> editarTareaMensual({
+    required Actividad tareaMensual,
+    required int diaMes,
+  });
+
+  Future<void> eliminarTareaMensualLogicamente(String id);
+
+  Future<OcurrenciaActividad?> obtenerOcurrenciaParaDia({
+    required String actividadId,
+    required DateTime dia,
+  });
+
+  Future<OcurrenciaActividad> obtenerOCrearOcurrenciaParaDia({
+    required String actividadId,
+    required DateTime dia,
+  });
+
+  Future<void> marcarOcurrenciaCompletada(String ocurrenciaId);
+
+  Future<void> marcarOcurrenciaPendiente(String ocurrenciaId);
+
+  Future<List<ElementoVistaTemporal>> listarParaHoy(DateTime dia);
+
+  Future<List<ElementoVistaTemporal>> listarProximas({DateTime? referencia});
+
+  Future<List<ElementoVistaTemporal>> listarVencidas({DateTime? referencia});
+
+  Future<List<ElementoVistaTemporal>> listarPorRangoFechas({
     required DateTime inicio,
     required DateTime fin,
   });
