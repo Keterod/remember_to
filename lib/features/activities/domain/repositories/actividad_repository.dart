@@ -39,4 +39,35 @@ abstract class ActividadRepository {
   Future<void> editarRecordatorio(Actividad recordatorio);
 
   Future<void> eliminarRecordatorioLogicamente(String id);
+
+  Future<Actividad> crearEvento({
+    required String titulo,
+    String? descripcion,
+    required DateTime fechaInicio,
+    required DateTime fechaFin,
+    bool urgente = false,
+  });
+
+  Future<List<Actividad>> listarEventosActivos();
+
+  Future<Actividad?> obtenerEventoPorId(String id);
+
+  Future<void> editarEvento(Actividad evento);
+
+  Future<void> eliminarEventoLogicamente(String id);
+
+  Future<void> marcarEventoCompletada(String id);
+
+  Future<void> marcarEventoPendiente(String id);
+
+  Future<List<Actividad>> listarParaHoy(DateTime dia);
+
+  Future<List<Actividad>> listarProximas({DateTime? referencia});
+
+  Future<List<Actividad>> listarVencidas({DateTime? referencia});
+
+  Future<List<Actividad>> listarPorRangoFechas({
+    required DateTime inicio,
+    required DateTime fin,
+  });
 }

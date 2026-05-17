@@ -4,6 +4,7 @@ import '../../../../shared/services/notifications/local_notifications_provider.d
 import '../../../../shared/services/notifications/local_notifications_service.dart';
 import '../../domain/entities/actividad.dart';
 import 'actividad_repository_provider.dart';
+import 'invalidar_vistas_temporales.dart';
 
 final recordatoriosProvider = AsyncNotifierProvider<RecordatoriosNotifier,
     List<Actividad>>(RecordatoriosNotifier.new);
@@ -59,18 +60,21 @@ class RecordatoriosNotifier extends AsyncNotifier<List<Actividad>> {
       urgente: urgente,
     );
     await recargar();
+    invalidarVistasTemporales(ref);
   }
 
   Future<void> editarRecordatorio(Actividad recordatorio) async {
     final repository = ref.read(actividadRepositoryProvider);
     await repository.editarRecordatorio(recordatorio);
     await recargar();
+    invalidarVistasTemporales(ref);
   }
 
   Future<void> eliminarRecordatorio(String id) async {
     final repository = ref.read(actividadRepositoryProvider);
     await repository.eliminarRecordatorioLogicamente(id);
     await recargar();
+    invalidarVistasTemporales(ref);
   }
 
   /// True si conviene mostrar [LocalNotificationsService.exactAlarmGuidanceMessage].

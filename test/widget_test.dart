@@ -1,4 +1,5 @@
 import 'package:drift/native.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -32,6 +33,6 @@ void main() {
       find.text('No hay tareas. Pulsa + para crear una.'),
       findsOneWidget,
     );
-    expect(find.text('Recordatorios'), findsOneWidget);
+    expect(find.byIcon(Icons.menu), findsOneWidget);
   });
 }

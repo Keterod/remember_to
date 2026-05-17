@@ -4,65 +4,67 @@ import '../../domain/entities/actividad.dart';
 import 'actividad_repository_provider.dart';
 import 'invalidar_vistas_temporales.dart';
 
-final tareasProvider =
-    AsyncNotifierProvider<TareasNotifier, List<Actividad>>(TareasNotifier.new);
+final eventosProvider =
+    AsyncNotifierProvider<EventosNotifier, List<Actividad>>(EventosNotifier.new);
 
-class TareasNotifier extends AsyncNotifier<List<Actividad>> {
+class EventosNotifier extends AsyncNotifier<List<Actividad>> {
   @override
   Future<List<Actividad>> build() async {
     final repository = ref.read(actividadRepositoryProvider);
-    return repository.listarTareasActivas();
+    return repository.listarEventosActivos();
   }
 
   Future<void> recargar() async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       final repository = ref.read(actividadRepositoryProvider);
-      return repository.listarTareasActivas();
+      return repository.listarEventosActivos();
     });
   }
 
-  Future<void> crearTarea({
+  Future<void> crearEvento({
     required String titulo,
     String? descripcion,
-    DateTime? fechaLimite,
+    required DateTime fechaInicio,
+    required DateTime fechaFin,
     bool urgente = false,
   }) async {
     final repository = ref.read(actividadRepositoryProvider);
-    await repository.crearTarea(
+    await repository.crearEvento(
       titulo: titulo,
       descripcion: descripcion,
-      fechaLimite: fechaLimite,
+      fechaInicio: fechaInicio,
+      fechaFin: fechaFin,
       urgente: urgente,
     );
     await recargar();
     invalidarVistasTemporales(ref);
   }
 
-  Future<void> editarTarea(Actividad tarea) async {
+  Future<void> editarEvento(Actividad evento) async {
     final repository = ref.read(actividadRepositoryProvider);
-    await repository.editarTarea(tarea);
+    await repository.editarEvento(evento);
     await recargar();
     invalidarVistasTemporales(ref);
   }
 
   Future<void> marcarCompletada(String id) async {
     final repository = ref.read(actividadRepositoryProvider);
-    await repository.marcarCompletada(id);
+    await repository.marcarEventoCompletada(id);
     await recargar();
     invalidarVistasTemporales(ref);
   }
 
   Future<void> marcarPendiente(String id) async {
     final repository = ref.read(actividadRepositoryProvider);
-    await repository.marcarPendiente(id);
+    await repository.marcarEventoPendiente(id);
     await recargar();
     invalidarVistasTemporales(ref);
   }
 
   Future<void> eliminarLogicamente(String id) async {
     final repository = ref.read(actividadRepositoryProvider);
-    await repository.eliminarLogicamente(id);
+    await repository.eliminarEventoLogicamente(id);
     await recargar();
     invalidarVistasTemporales(ref);
   }
