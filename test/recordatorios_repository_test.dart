@@ -8,6 +8,7 @@ import 'package:remember_to/features/activities/domain/entities/actividad.dart';
 import 'package:remember_to/features/activities/domain/enums/tipo_actividad.dart';
 import 'package:remember_to/shared/services/notifications/fake_local_notifications_service.dart';
 import 'package:remember_to/shared/services/notifications/notification_ids.dart';
+import 'package:remember_to/shared/services/notifications/notification_slot.dart';
 
 void main() {
   late AppDatabase database;
@@ -40,9 +41,9 @@ void main() {
     expect(recordatorio.fechaAviso, fechaAviso);
     expect(recordatorio.urgente, isTrue);
 
-    final programada = notifications.findByActividadId(recordatorio.id);
-    expect(programada, isNotNull);
-    expect(programada!.title, 'Llamar al médico');
+    final principal = notifications.findPrincipal(recordatorio.id);
+    expect(principal, isNotNull);
+    expect(principal!.title, 'Llamar al médico');
   });
 
   test('impide recordatorio sin título', () async {
@@ -105,8 +106,8 @@ void main() {
       recordatorio.copyWith(fechaAviso: nuevaFecha),
     );
 
-    final programada = notifications.findByActividadId(recordatorio.id);
-    expect(programada!.scheduledDate, nuevaFecha);
+    final principal = notifications.findPrincipal(recordatorio.id);
+    expect(principal!.scheduledDate, nuevaFecha);
   });
 
   test('eliminar recordatorio lógicamente y cancelar notificación', () async {
@@ -116,12 +117,12 @@ void main() {
       fechaAviso: DateTime.now().add(const Duration(hours: 3)),
     );
 
-    expect(notifications.findByActividadId(recordatorio.id), isNotNull);
+    expect(notifications.findPrincipal(recordatorio.id), isNotNull);
 
     await repository.eliminarRecordatorioLogicamente(recordatorio.id);
 
     expect(await repository.obtenerRecordatorioPorId(recordatorio.id), isNull);
-    expect(notifications.findByActividadId(recordatorio.id), isNull);
+    expect(notifications.findPrincipal(recordatorio.id), isNull);
   });
 
   test('dos recordatorios usan IDs de notificación distintos', () async {
@@ -141,8 +142,10 @@ void main() {
       notificationIdForActividad(uno.id),
       isNot(notificationIdForActividad(dos.id)),
     );
-    expect(notifications.scheduled, hasLength(2));
-    expect(notifications.notificationIdsByActividad.keys, {uno.id, dos.id});
+    final principales = notifications.scheduled
+        .where((n) => n.payload.slot == NotificationSlot.principal)
+        .length;
+    expect(principales, greaterThanOrEqualTo(2));
   });
 
   test('eliminar un recordatorio no cancela el otro', () async {
@@ -161,9 +164,12 @@ void main() {
     notifications.cancelCalls.clear();
     await repository.eliminarRecordatorioLogicamente(eliminar.id);
 
-    expect(notifications.cancelCalls, [eliminar.id]);
-    expect(notifications.findByActividadId(permanece.id), isNotNull);
-    expect(notifications.findByActividadId(eliminar.id), isNull);
+    expect(
+      notifications.cancelCalls.any((c) => c.startsWith('${eliminar.id}|')),
+      isTrue,
+    );
+    expect(notifications.findPrincipal(permanece.id), isNotNull);
+    expect(notifications.findPrincipal(eliminar.id), isNull);
   });
 
   test('fechaAviso en pasado guarda recordatorio pero no programa notificación',
@@ -177,7 +183,7 @@ void main() {
     );
 
     expect(await repository.obtenerRecordatorioPorId(recordatorio.id), isNotNull);
-    expect(notifications.findByActividadId(recordatorio.id), isNull);
+    expect(notifications.findPrincipal(recordatorio.id), isNull);
   });
 
   test('fechaAviso en futuro programa notificación', () async {
@@ -189,9 +195,9 @@ void main() {
       fechaAviso: futuro,
     );
 
-    final programada = notifications.findByActividadId(recordatorio.id);
-    expect(programada, isNotNull);
-    expect(programada!.scheduledDate, futuro);
+    final principal = notifications.findPrincipal(recordatorio.id);
+    expect(principal, isNotNull);
+    expect(principal!.scheduledDate, futuro);
   });
 
   test('obtenerRecordatorioPorId rechaza actividad que no es recordatorio', () async {

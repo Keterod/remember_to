@@ -42,6 +42,8 @@ abstract class ActividadRepository {
 
   Future<void> editarRecordatorio(Actividad recordatorio);
 
+  Future<void> marcarRecordatorioCompletada(String id);
+
   Future<void> eliminarRecordatorioLogicamente(String id);
 
   Future<Actividad> crearEvento({
@@ -114,9 +116,16 @@ abstract class ActividadRepository {
     required DateTime dia,
   });
 
+  Future<OcurrenciaActividad?> obtenerOcurrenciaPorId(String ocurrenciaId);
+
   Future<void> marcarOcurrenciaCompletada(String ocurrenciaId);
 
   Future<void> marcarOcurrenciaPendiente(String ocurrenciaId);
+
+  Future<void> marcarOcurrenciaPospuesta({
+    required String ocurrenciaId,
+    required DateTime postponedTo,
+  });
 
   Future<List<ElementoVistaTemporal>> listarParaHoy(DateTime dia);
 

@@ -1,27 +1,22 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
+import '../../../features/activities/domain/enums/tipo_actividad.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 import 'local_notifications_service.dart';
+import 'notification_action_handler.dart';
+import 'notification_action_ids.dart';
+import 'notification_constants.dart';
 import 'notification_ids.dart';
+import 'notification_payload.dart';
 import 'notification_schedule_result.dart';
+import 'notification_slot.dart';
 
-/// Notificaciones locales con [flutter_local_notifications].
-///
-/// Android (Sprint 3):
-/// - Intenta [AndroidScheduleMode.exactAllowWhileIdle] si hay permiso
-///   [SCHEDULE_EXACT_ALARM] / [canScheduleExactNotifications].
-/// - Si falla o no hay permiso, usa [AndroidScheduleMode.inexactAllowWhileIdle].
-/// - Android 13+ requiere [POST_NOTIFICATIONS] por separado.
-/// - Tras reiniciar el dispositivo, los avisos no se reponen en este sprint.
+/// Notificaciones locales con [flutter_local_notifications] (Sprint 3–7).
 class FlutterLocalNotificationsService implements LocalNotificationsService {
   FlutterLocalNotificationsService();
-
-  static const _channelId = 'recordatorios';
-  static const _channelName = 'Recordatorios';
-  static const _channelDescription =
-      'Avisos de recordatorios de Remember To.App';
 
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
@@ -46,13 +41,18 @@ class FlutterLocalNotificationsService implements LocalNotificationsService {
       iOS: iosSettings,
     );
 
-    await _plugin.initialize(settings);
+    await _plugin.initialize(
+      settings,
+      onDidReceiveNotificationResponse: onForegroundNotificationResponse,
+      onDidReceiveBackgroundNotificationResponse:
+          onBackgroundNotificationResponse,
+    );
 
     await _androidPlugin?.createNotificationChannel(
       const AndroidNotificationChannel(
-        _channelId,
-        _channelName,
-        description: _channelDescription,
+        NotificationConstants.channelId,
+        'Recordatorios',
+        description: 'Avisos de actividades de Remember To.App',
         importance: Importance.high,
       ),
     );
@@ -66,13 +66,11 @@ class FlutterLocalNotificationsService implements LocalNotificationsService {
     if (status.isGranted) {
       return true;
     }
-
     final androidPlugin = _androidPlugin;
     if (androidPlugin != null) {
       final granted = await androidPlugin.requestNotificationsPermission();
       return granted ?? false;
     }
-
     return false;
   }
 
@@ -82,13 +80,11 @@ class FlutterLocalNotificationsService implements LocalNotificationsService {
     if (status.isGranted) {
       return true;
     }
-
     final androidPlugin = _androidPlugin;
     if (androidPlugin != null) {
       final enabled = await androidPlugin.areNotificationsEnabled();
       return enabled ?? false;
     }
-
     return false;
   }
 
@@ -110,41 +106,87 @@ class FlutterLocalNotificationsService implements LocalNotificationsService {
     return await androidPlugin.requestExactAlarmsPermission() ?? false;
   }
 
-  static tz.TZDateTime _toLocalTzDateTime(DateTime fechaAviso) {
+  static tz.TZDateTime _toLocalTzDateTime(DateTime fecha) {
     return tz.TZDateTime(
       tz.local,
-      fechaAviso.year,
-      fechaAviso.month,
-      fechaAviso.day,
-      fechaAviso.hour,
-      fechaAviso.minute,
-      fechaAviso.second,
-      fechaAviso.millisecond,
-      fechaAviso.microsecond,
+      fecha.year,
+      fecha.month,
+      fecha.day,
+      fecha.hour,
+      fecha.minute,
+      fecha.second,
+      fecha.millisecond,
+      fecha.microsecond,
     );
   }
 
+  List<AndroidNotificationAction>? _androidActions(
+    bool includeActions,
+    TipoActividad tipo,
+  ) {
+    if (!includeActions) {
+      return null;
+    }
+    final completarLabel =
+        tipo == TipoActividad.recordatorio ? 'Listo' : 'Completar';
+
+    return [
+      AndroidNotificationAction(
+        NotificationActionIds.completar,
+        completarLabel,
+        showsUserInterface: false,
+        cancelNotification: true,
+      ),
+      const AndroidNotificationAction(
+        NotificationActionIds.posponer10,
+        '+10 min',
+        showsUserInterface: false,
+        cancelNotification: true,
+      ),
+      const AndroidNotificationAction(
+        NotificationActionIds.posponer30,
+        '+30 min',
+        showsUserInterface: false,
+        cancelNotification: true,
+      ),
+      const AndroidNotificationAction(
+        NotificationActionIds.posponer60,
+        '+1 h',
+        showsUserInterface: false,
+        cancelNotification: true,
+      ),
+    ];
+  }
+
   @override
-  Future<ScheduleReminderResult> scheduleReminderNotification({
-    required String actividadId,
+  Future<ScheduleReminderResult> scheduleActivityNotification({
+    required NotificationPayload payload,
     required String title,
     String? body,
     required DateTime scheduledDate,
+    bool includeActions = true,
   }) async {
     await initialize();
 
     final ahora = DateTime.now();
+    if (!scheduledDate.isAfter(ahora)) {
+      return const ScheduleReminderResult(
+        NotificationSchedulePrecision.inexact,
+      );
+    }
+
     final scheduled = _toLocalTzDateTime(scheduledDate);
-    final notificationId = notificationIdForActividad(actividadId);
-    final delta = scheduledDate.difference(ahora);
+    final notificationId = notificationIdForKey(
+      actividadId: payload.actividadId,
+      ocurrenciaId: payload.ocurrenciaId,
+      slot: payload.slot,
+      repeatAttempt: payload.repeatAttempt,
+    );
 
     if (kDebugMode) {
       debugPrint(
-        '[Notif] programar id=$actividadId notifId=$notificationId '
-        'fechaAviso=$scheduledDate tz=$scheduled ahora=$ahora '
-        'delta=${delta.inSeconds}s (${delta.inMinutes} min) '
-        'tzLocal=${tz.local.name} '
-        'exactPermitido=${await canScheduleExactAlarms()}',
+        '[Notif] programar ${payload.actividadId} '
+        'slot=${payload.slot.name} fecha=$scheduledDate',
       );
     }
 
@@ -155,19 +197,16 @@ class FlutterLocalNotificationsService implements LocalNotificationsService {
           title: title,
           body: body,
           scheduled: scheduled,
+          payload: payload,
           mode: AndroidScheduleMode.exactAllowWhileIdle,
+          includeActions: includeActions,
         );
-        if (kDebugMode) {
-          debugPrint('[Notif] modo usado=exactAllowWhileIdle');
-        }
         return const ScheduleReminderResult(
           NotificationSchedulePrecision.exact,
         );
       } catch (error, stackTrace) {
         if (kDebugMode) {
-          debugPrint(
-            '[Notif] exactAllowWhileIdle falló, fallback inexacto: $error',
-          );
+          debugPrint('[Notif] exact falló, fallback: $error');
           debugPrint('$stackTrace');
         }
       }
@@ -178,11 +217,10 @@ class FlutterLocalNotificationsService implements LocalNotificationsService {
       title: title,
       body: body,
       scheduled: scheduled,
+      payload: payload,
       mode: AndroidScheduleMode.inexactAllowWhileIdle,
+      includeActions: includeActions,
     );
-    if (kDebugMode) {
-      debugPrint('[Notif] modo usado=inexactAllowWhileIdle');
-    }
     return const ScheduleReminderResult(
       NotificationSchedulePrecision.inexact,
     );
@@ -193,35 +231,73 @@ class FlutterLocalNotificationsService implements LocalNotificationsService {
     required String title,
     required String? body,
     required tz.TZDateTime scheduled,
+    required NotificationPayload payload,
     required AndroidScheduleMode mode,
+    required bool includeActions,
   }) {
     return _plugin.zonedSchedule(
       notificationId,
       title,
       body,
       scheduled,
-      const NotificationDetails(
+      NotificationDetails(
         android: AndroidNotificationDetails(
-          _channelId,
-          _channelName,
-          channelDescription: _channelDescription,
+          NotificationConstants.channelId,
+          'Recordatorios',
+          channelDescription: 'Avisos de actividades de Remember To.App',
           importance: Importance.high,
           priority: Priority.high,
+          actions: _androidActions(includeActions, payload.tipo),
         ),
-        iOS: DarwinNotificationDetails(),
+        iOS: const DarwinNotificationDetails(),
       ),
       androidScheduleMode: mode,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
+      payload: payload.toJsonString(),
     );
   }
 
   @override
-  Future<void> cancelReminderNotification(String actividadId) async {
-    final notificationId = notificationIdForActividad(actividadId);
-    if (kDebugMode) {
-      debugPrint('[Notif] cancelar id=$actividadId notifId=$notificationId');
+  Future<void> cancelActivityNotifications({
+    required String actividadId,
+    String? ocurrenciaId,
+  }) async {
+    await initialize();
+    for (final slot in NotificationSlot.values) {
+      for (var i = 0; i <= NotificationConstants.maxRepeticiones; i++) {
+        final id = notificationIdForKey(
+          actividadId: actividadId,
+          ocurrenciaId: ocurrenciaId,
+          slot: slot,
+          repeatAttempt: i,
+        );
+        await _plugin.cancel(id);
+      }
     }
-    await _plugin.cancel(notificationId);
+    await _plugin.cancel(notificationIdForActividad(actividadId));
+  }
+
+  @override
+  Future<void> cancelReminderNotification(String actividadId) {
+    return cancelActivityNotifications(actividadId: actividadId);
+  }
+
+  @override
+  Future<ScheduleReminderResult> scheduleReminderNotification({
+    required String actividadId,
+    required String title,
+    String? body,
+    required DateTime scheduledDate,
+  }) {
+    return scheduleActivityNotification(
+      payload: NotificationPayload(
+        actividadId: actividadId,
+        tipo: TipoActividad.recordatorio,
+      ),
+      title: title,
+      body: body,
+      scheduledDate: scheduledDate,
+    );
   }
 }

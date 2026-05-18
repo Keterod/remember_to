@@ -170,12 +170,16 @@ class _TareaMensualFormScreenState extends ConsumerState<TareaMensualFormScreen>
   }
 
   Future<void> _guardar() async {
+    if (_guardando) {
+      return;
+    }
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
     final diaMes = int.parse(_diaMesController.text.trim());
-    setState(() => _guardando = true);
+    _guardando = true;
+    setState(() {});
 
     try {
       final notifier = ref.read(tareasMensualesProvider.notifier);
@@ -204,17 +208,15 @@ class _TareaMensualFormScreenState extends ConsumerState<TareaMensualFormScreen>
         );
       }
 
-      if (mounted) {
-        context.pop();
+      if (!mounted) {
+        return;
       }
+      context.pop(true);
     } on ValidationException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.message)),
         );
-      }
-    } finally {
-      if (mounted) {
         setState(() => _guardando = false);
       }
     }

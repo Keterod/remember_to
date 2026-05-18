@@ -165,3 +165,15 @@ Se deben probar cuando la función exista:
 | CP-48 | Seleccionar evento en búsqueda | Buscar un evento y seleccionar el resultado. | Se abre la pantalla de edición de evento. |
 | CP-49 | Seleccionar rutina en búsqueda | Buscar una rutina y seleccionar el resultado. | Se abre la pantalla de edición de rutina. |
 | CP-50 | Seleccionar tarea mensual en búsqueda | Buscar una tarea mensual y seleccionar el resultado. | Se abre la pantalla de edición de tarea mensual. |
+| CP-51 | Payload de notificación | Programar aviso y leer payload serializado. | Incluye `actividadId`, `tipo`, `slot`; `ocurrenciaId` si aplica. |
+| CP-52 | Completar ocurrencia desde notificación | Acción completar sobre ocurrencia de rutina. | Solo esa ocurrencia queda completada; la rutina sigue activa. |
+| CP-53 | Límite de repeticiones | Programar recordatorio futuro y revisar avisos. | Hasta 3 repeticiones tras el principal; no más. |
+| CP-54 | Sin aviso sin fecha | Crear tarea sin fecha límite. | No se programan notificaciones. |
+| CP-55 | Actividad eliminada en callback | Completar desde notificación tras eliminar actividad. | No falla la app ni duplica cambios. |
+| CP-56 | Aviso anticipado recordatorio | Recordatorio a las 12:00. | Aviso anticipado a las 11:45. |
+| CP-57 | Posponer recordatorio 30 min | Acción posponer 30 min en notificación. | `fechaAviso` se actualiza y se reprograman avisos. |
+| CP-58 | Completar recordatorio cancela avisos | Completar desde notificación. | Estado completada y avisos cancelados. |
+| CP-59 | Botón Listo no abre app | Tocar Listo con app en segundo plano. | La app no pasa a primer plano; el recordatorio queda atendido. |
+| CP-60 | Posponer actualiza hora visible | Posponer 10 min y abrir Recordatorios. | La hora de aviso mostrada coincide con la nueva programación. |
+| CP-61 | Repetición con acciones | Dejar pendiente hasta repetición. | La notificación repetida muestra Listo y posponer. |
+| CP-62 | Recordatorio muestra estado | Crear recordatorio y marcar Listo. | La lista muestra «Atendido» y la nueva hora si se pospuso. |

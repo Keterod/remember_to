@@ -8,6 +8,7 @@ import '../../../../core/errors/validation_exception.dart';
 import '../../../../shared/services/notifications/local_notifications_service.dart';
 import '../../application/providers/recordatorios_provider.dart';
 import '../../domain/entities/actividad.dart';
+import '../../domain/enums/estado_actividad.dart';
 
 /// Lista básica de recordatorios (Sprint 3).
 class RecordatoriosListScreen extends ConsumerStatefulWidget {
@@ -171,6 +172,8 @@ class _RecordatorioListTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final fechaAviso = recordatorio.fechaAviso;
+    final atendido = recordatorio.estado == EstadoActividad.completada;
+    final estadoTexto = atendido ? 'Atendido' : 'Pendiente';
 
     return ListTile(
       title: Row(
@@ -186,6 +189,7 @@ class _RecordatorioListTile extends ConsumerWidget {
           if (recordatorio.descripcion != null &&
               recordatorio.descripcion!.isNotEmpty)
             Text(recordatorio.descripcion!),
+          Text(estadoTexto),
           Text(
             fechaAviso == null
                 ? 'Sin aviso'

@@ -220,6 +220,16 @@ HU-13, HU-14, RF-36, RF-55, RF-56, RF-57, RF-58.
 - Posponer desde notificación reprograma el aviso de la actividad u ocurrencia.
 - Las limitaciones del sistema operativo quedan comunicadas.
 
+**Entregables Sprint 7 (cerrado)**
+
+- Payload JSON: `actividadId`, `ocurrenciaId` opcional, `tipo`, `slot`, `repeatAttempt`.
+- Acciones Android: completar, posponer 10/30/60 min.
+- Callback top-level sin `BuildContext`; `NotificationActionExecutor` abre Drift en segundo plano.
+- Avisos anticipados por defecto: recordatorio −15 min, evento −30 min, tarea −1 h.
+- Repeticiones: hasta 3 avisos cada 10 min tras el principal (sin acciones en repeticiones).
+- Reglas por tipo; sin fecha/hora clara no se programa.
+- Tests: `test/notification_sprint7_test.dart`.
+
 **Resultado esperado**  
 Notificaciones más útiles para uso real, sin prometer exactitud absoluta.
 

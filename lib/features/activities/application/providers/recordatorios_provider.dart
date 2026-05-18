@@ -60,21 +60,21 @@ class RecordatoriosNotifier extends AsyncNotifier<List<Actividad>> {
       urgente: urgente,
     );
     await recargar();
-    invalidarVistasTemporales(ref);
+    invalidarVistasTemporales(ref, incluirRecordatorios: false);
   }
 
   Future<void> editarRecordatorio(Actividad recordatorio) async {
     final repository = ref.read(actividadRepositoryProvider);
     await repository.editarRecordatorio(recordatorio);
     await recargar();
-    invalidarVistasTemporales(ref);
+    invalidarVistasTemporales(ref, incluirRecordatorios: false);
   }
 
   Future<void> eliminarRecordatorio(String id) async {
     final repository = ref.read(actividadRepositoryProvider);
     await repository.eliminarRecordatorioLogicamente(id);
     await recargar();
-    invalidarVistasTemporales(ref);
+    invalidarVistasTemporales(ref, incluirRecordatorios: false);
   }
 
   /// True si conviene mostrar [LocalNotificationsService.exactAlarmGuidanceMessage].

@@ -159,6 +159,12 @@ class _EventoFormScreenState extends ConsumerState<EventoFormScreen> {
               value: _urgente,
               onChanged: (value) => setState(() => _urgente = value),
             ),
+            const SizedBox(height: 8),
+            const Text(
+              'Se programa un aviso 30 minutos antes del inicio y otro al inicio. '
+              'Desde la notificación puedes completar o posponer.',
+              style: TextStyle(fontSize: 12),
+            ),
             const SizedBox(height: 24),
             FilledButton(
               onPressed: _guardando ? null : _guardar,
@@ -214,6 +220,9 @@ class _EventoFormScreenState extends ConsumerState<EventoFormScreen> {
   }
 
   Future<void> _guardar() async {
+    if (_guardando) {
+      return;
+    }
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -226,7 +235,8 @@ class _EventoFormScreenState extends ConsumerState<EventoFormScreen> {
       return;
     }
 
-    setState(() => _guardando = true);
+    _guardando = true;
+    setState(() {});
 
     try {
       final notifier = ref.read(eventosProvider.notifier);
@@ -257,17 +267,15 @@ class _EventoFormScreenState extends ConsumerState<EventoFormScreen> {
         );
       }
 
-      if (mounted) {
-        context.pop();
+      if (!mounted) {
+        return;
       }
+      context.pop(true);
     } on ValidationException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.message)),
         );
-      }
-    } finally {
-      if (mounted) {
         setState(() => _guardando = false);
       }
     }

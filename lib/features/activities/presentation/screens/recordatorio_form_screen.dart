@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/errors/validation_exception.dart';
-import '../../../../shared/services/notifications/local_notifications_service.dart';
 import '../../application/providers/actividad_repository_provider.dart';
 import '../../application/providers/recordatorios_provider.dart';
 import '../../domain/entities/actividad.dart';
@@ -158,6 +157,13 @@ class _RecordatorioFormScreenState extends ConsumerState<RecordatorioFormScreen>
               'al 100 % en todos los dispositivos Android.',
               style: TextStyle(fontSize: 12),
             ),
+            const SizedBox(height: 8),
+            const Text(
+              'Recibirás un aviso anticipado 15 minutos antes. Desde la notificación '
+              'podrás completar o posponer (10, 30 o 60 min). Si Android no ejecuta '
+              'la acción, hazlo desde la app.',
+              style: TextStyle(fontSize: 12),
+            ),
             const SizedBox(height: 24),
             FilledButton(
               onPressed: _guardando ? null : _guardar,
@@ -209,6 +215,9 @@ class _RecordatorioFormScreenState extends ConsumerState<RecordatorioFormScreen>
   }
 
   Future<void> _guardar() async {
+    if (_guardando) {
+      return;
+    }
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -221,16 +230,11 @@ class _RecordatorioFormScreenState extends ConsumerState<RecordatorioFormScreen>
       return;
     }
 
-    setState(() => _guardando = true);
+    _guardando = true;
+    setState(() {});
 
     try {
       final notifier = ref.read(recordatoriosProvider.notifier);
-
-      if (!await notifier.permisosNotificacionActivos()) {
-        await notifier.solicitarPermisosNotificacion();
-      } else if (await notifier.debeMostrarGuiaAlarmaExacta()) {
-        await notifier.solicitarAlarmaExacta();
-      }
 
       if (widget.esEdicion) {
         final existente = _recordatorioExistente!;
@@ -259,48 +263,23 @@ class _RecordatorioFormScreenState extends ConsumerState<RecordatorioFormScreen>
       if (!mounted) {
         return;
       }
-
-      final permisos = await notifier.permisosNotificacionActivos();
-      if (!mounted) {
-        return;
-      }
-
-      if (!permisos) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Recordatorio guardado. Sin permisos de notificación '
-              'el aviso no está garantizado.',
-            ),
-          ),
-        );
-      } else {
-        final necesitaGuiaExacta = await notifier.debeMostrarGuiaAlarmaExacta();
-        if (!mounted) {
-          return;
-        }
-        if (necesitaGuiaExacta) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                LocalNotificationsService.exactAlarmGuidanceMessage,
-              ),
-            ),
-          );
-        }
-      }
-      if (!mounted) {
-        return;
-      }
-      context.pop();
+      context.pop(true);
     } on ValidationException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.message)),
         );
+        setState(() => _guardando = false);
       }
-    } finally {
+    } catch (e) {
       if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No se pudo guardar el recordatorio. Inténtalo de nuevo.',
+            ),
+          ),
+        );
         setState(() => _guardando = false);
       }
     }

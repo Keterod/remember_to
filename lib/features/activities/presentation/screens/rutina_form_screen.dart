@@ -195,6 +195,9 @@ class _RutinaFormScreenState extends ConsumerState<RutinaFormScreen> {
   }
 
   Future<void> _guardar() async {
+    if (_guardando) {
+      return;
+    }
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -207,7 +210,8 @@ class _RutinaFormScreenState extends ConsumerState<RutinaFormScreen> {
       return;
     }
 
-    setState(() => _guardando = true);
+    _guardando = true;
+    setState(() {});
 
     try {
       final notifier = ref.read(rutinasProvider.notifier);
@@ -240,17 +244,15 @@ class _RutinaFormScreenState extends ConsumerState<RutinaFormScreen> {
         );
       }
 
-      if (mounted) {
-        context.pop();
+      if (!mounted) {
+        return;
       }
+      context.pop(true);
     } on ValidationException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.message)),
         );
-      }
-    } finally {
-      if (mounted) {
         setState(() => _guardando = false);
       }
     }

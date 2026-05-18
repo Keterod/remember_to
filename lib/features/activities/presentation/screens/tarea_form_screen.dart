@@ -156,6 +156,14 @@ class _TareaFormScreenState extends ConsumerState<TareaFormScreen> {
               value: _urgente,
               onChanged: (value) => setState(() => _urgente = value),
             ),
+            if (_fechaLimite != null) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'Con fecha límite se programa un aviso 1 hora antes y otro en la fecha. '
+                'Desde la notificación puedes completar o posponer.',
+                style: TextStyle(fontSize: 12),
+              ),
+            ],
             const SizedBox(height: 24),
             FilledButton(
               onPressed: _guardando ? null : _guardar,
@@ -189,11 +197,15 @@ class _TareaFormScreenState extends ConsumerState<TareaFormScreen> {
   }
 
   Future<void> _guardar() async {
+    if (_guardando) {
+      return;
+    }
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    setState(() => _guardando = true);
+    _guardando = true;
+    setState(() {});
 
     try {
       final notifier = ref.read(tareasProvider.notifier);
@@ -224,17 +236,15 @@ class _TareaFormScreenState extends ConsumerState<TareaFormScreen> {
         );
       }
 
-      if (mounted) {
-        context.pop();
+      if (!mounted) {
+        return;
       }
+      context.pop(true);
     } on ValidationException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.message)),
         );
-      }
-    } finally {
-      if (mounted) {
         setState(() => _guardando = false);
       }
     }

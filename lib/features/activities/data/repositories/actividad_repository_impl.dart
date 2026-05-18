@@ -1,11 +1,9 @@
 import 'package:drift/drift.dart';
-import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
-
-import '../../../../shared/services/notifications/notification_ids.dart';
 
 import '../../../../core/errors/validation_exception.dart';
 import '../../../../shared/services/notifications/local_notifications_service.dart';
+import '../../../../shared/services/notifications/notification_scheduler.dart';
 import '../../domain/entities/actividad.dart';
 import '../../domain/entities/elemento_vista_temporal.dart';
 import '../../domain/entities/historial_actividad.dart';
@@ -35,6 +33,8 @@ class ActividadRepositoryImpl implements ActividadRepository {
 
   final AppDatabase database;
   final LocalNotificationsService _notifications;
+  late final NotificationScheduler _notificationScheduler =
+      NotificationScheduler(_notifications);
   static const _uuid = Uuid();
   DateTime? _ultimaFechaHistorial;
 
@@ -138,6 +138,7 @@ class ActividadRepositoryImpl implements ActividadRepository {
       accion: AccionHistorial.creada,
       detalle: tarea.titulo,
     );
+    await _notificationScheduler.sincronizarActividad(tarea);
     return tarea;
   }
 
@@ -209,6 +210,32 @@ class ActividadRepositoryImpl implements ActividadRepository {
       anterior: existente,
       actualizada: actualizada,
     );
+    await _notificationScheduler.sincronizarActividad(actualizada);
+  }
+
+  @override
+  Future<void> marcarRecordatorioCompletada(String id) async {
+    final recordatorio = await _obtenerRecordatorio(id);
+    await guardar(
+      Actividad(
+        id: recordatorio.id,
+        tipo: recordatorio.tipo,
+        titulo: recordatorio.titulo,
+        descripcion: recordatorio.descripcion,
+        estado: EstadoActividad.completada,
+        urgente: recordatorio.urgente,
+        fechaAviso: recordatorio.fechaAviso,
+        createdAt: recordatorio.createdAt,
+        updatedAt: DateTime.now(),
+        deletedAt: recordatorio.deletedAt,
+      ),
+    );
+    await _registrarHistorial(
+      actividadId: id,
+      accion: AccionHistorial.completada,
+      detalle: recordatorio.titulo,
+    );
+    await _notificationScheduler.cancelarActividad(actividadId: id);
   }
 
   @override
@@ -252,6 +279,7 @@ class ActividadRepositoryImpl implements ActividadRepository {
       accion: AccionHistorial.completada,
       detalle: tarea.titulo,
     );
+    await _notificationScheduler.cancelarActividad(actividadId: id);
   }
 
   @override
@@ -291,6 +319,7 @@ class ActividadRepositoryImpl implements ActividadRepository {
       accion: AccionHistorial.eliminada,
       detalle: tarea.titulo,
     );
+    await _notificationScheduler.cancelarActividad(actividadId: id);
   }
 
   @override
@@ -327,6 +356,7 @@ class ActividadRepositoryImpl implements ActividadRepository {
       accion: AccionHistorial.creada,
       detalle: evento.titulo,
     );
+    await _notificationScheduler.sincronizarActividad(evento);
     return evento;
   }
 
@@ -384,6 +414,7 @@ class ActividadRepositoryImpl implements ActividadRepository {
       anterior: existente,
       actualizada: actualizado,
     );
+    await _notificationScheduler.sincronizarActividad(actualizado);
   }
 
   @override
@@ -410,6 +441,7 @@ class ActividadRepositoryImpl implements ActividadRepository {
       accion: AccionHistorial.eliminada,
       detalle: evento.titulo,
     );
+    await _notificationScheduler.cancelarActividad(actividadId: id);
   }
 
   @override
@@ -421,6 +453,7 @@ class ActividadRepositoryImpl implements ActividadRepository {
       accion: AccionHistorial.completada,
       detalle: evento.titulo,
     );
+    await _notificationScheduler.cancelarActividad(actividadId: id);
   }
 
   @override
@@ -801,7 +834,17 @@ class ActividadRepositoryImpl implements ActividadRepository {
       updatedAt: ahora,
     );
     await _guardarOcurrencia(ocurrencia);
+    await _sincronizarNotificacionOcurrencia(actividadId, ocurrencia.id);
     return ocurrencia;
+  }
+
+  @override
+  Future<OcurrenciaActividad?> obtenerOcurrenciaPorId(String ocurrenciaId) async {
+    try {
+      return await _obtenerOcurrencia(ocurrenciaId);
+    } on ValidationException {
+      return null;
+    }
   }
 
   @override
@@ -822,6 +865,10 @@ class ActividadRepositoryImpl implements ActividadRepository {
       accion: AccionHistorial.ocurrenciaCompletada,
       detalle: actividad?.titulo,
     );
+    await _notificationScheduler.cancelarActividad(
+      actividadId: ocurrencia.actividadId,
+      ocurrenciaId: ocurrenciaId,
+    );
   }
 
   @override
@@ -840,6 +887,26 @@ class ActividadRepositoryImpl implements ActividadRepository {
       ocurrenciaId: ocurrenciaId,
       accion: AccionHistorial.ocurrenciaPendiente,
       detalle: actividad?.titulo,
+    );
+    await _sincronizarNotificacionOcurrencia(ocurrencia.actividadId, ocurrenciaId);
+  }
+
+  @override
+  Future<void> marcarOcurrenciaPospuesta({
+    required String ocurrenciaId,
+    required DateTime postponedTo,
+  }) async {
+    final ocurrencia = await _obtenerOcurrencia(ocurrenciaId);
+    await _guardarOcurrencia(
+      ocurrencia.copyWith(
+        estadoOcurrencia: EstadoOcurrencia.pospuesta,
+        postponedTo: postponedTo,
+        updatedAt: DateTime.now(),
+      ),
+    );
+    await _sincronizarNotificacionOcurrencia(
+      ocurrencia.actividadId,
+      ocurrenciaId,
     );
   }
 
@@ -1017,53 +1084,25 @@ class ActividadRepositoryImpl implements ActividadRepository {
   }
 
   Future<void> _sincronizarNotificacionRecordatorio(Actividad recordatorio) async {
-    final ahora = DateTime.now();
-    await _notifications.cancelReminderNotification(recordatorio.id);
+    await _notificationScheduler.sincronizarActividad(recordatorio);
+  }
 
-    if (recordatorio.fechaAviso == null) {
-      if (kDebugMode) {
-        debugPrint(
-          '[Notif] omitir ${recordatorio.id}: sin fechaAviso',
-        );
-      }
+  Future<void> _sincronizarNotificacionOcurrencia(
+    String actividadId,
+    String ocurrenciaId,
+  ) async {
+    final actividad = await obtenerPorId(actividadId);
+    if (actividad == null) {
       return;
     }
-
-    if (!recordatorio.fechaAviso!.isAfter(ahora)) {
-      if (kDebugMode) {
-        debugPrint(
-          '[Notif] omitir ${recordatorio.id}: fechaAviso en pasado '
-          '(${recordatorio.fechaAviso})',
-        );
-      }
+    final ocurrencia = await obtenerOcurrenciaPorId(ocurrenciaId);
+    if (ocurrencia == null) {
       return;
     }
-
-    final permisos = await _notifications.areNotificationsEnabled();
-    if (!permisos) {
-      if (kDebugMode) {
-        debugPrint(
-          '[Notif] omitir ${recordatorio.id}: permisos de notificación no activos',
-        );
-      }
-      return;
-    }
-
-    if (kDebugMode) {
-      debugPrint(
-        '[Notif] sincronizar ${recordatorio.id} '
-        'notifId=${notificationIdForActividad(recordatorio.id)} '
-        'fechaAviso=${recordatorio.fechaAviso}',
-      );
-    }
-
-    await _notifications.scheduleReminderNotification(
-      actividadId: recordatorio.id,
-      title: recordatorio.titulo,
-      body: recordatorio.descripcion,
-      scheduledDate: recordatorio.fechaAviso!,
+    await _notificationScheduler.sincronizarOcurrencia(
+      actividad: actividad,
+      ocurrencia: ocurrencia,
     );
-    // El resultado (exacto/inexacto) queda disponible vía el servicio para la UI.
   }
 
   Future<Actividad> _obtenerTarea(String id) async {
